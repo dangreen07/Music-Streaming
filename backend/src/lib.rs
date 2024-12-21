@@ -1,0 +1,88 @@
+use argon2::{Argon2, PasswordHasher};
+use diesel::prelude::*;
+use dotenvy::dotenv;
+use password_hash::{rand_core::OsRng, SaltString};
+use uuid::Uuid;
+use std::env;
+
+use crate::models::*;
+
+pub mod models;
+pub mod schema;
+
+pub fn establish_connection() -> PgConnection {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    PgConnection::establish(&database_url)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+}
+
+pub fn create_user(conn: &mut PgConnection, arg_username: &str, password: &str) -> Result<Users, &'static str> {
+    use crate::schema::users;
+    use crate::schema::users::dsl::*;
+
+    // Checking if the user already exists
+    let response = users.filter(username.eq(arg_username)).select(Users::as_select()).load(conn).expect("Error selecting from database!");
+    if response.len() != 0 {
+        return Err("Username already exists!");
+    }
+
+    // Hashing the password
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let password_hash2 = argon2.hash_password(password.as_bytes(), &salt).expect("Failed to hash password!").to_string();
+
+    // Creating the user
+    let new_user = NewUser {
+        username: arg_username,
+        password_hash: &password_hash2,
+    };
+    
+    // Inserting the user into the database
+    let result = diesel::insert_into(users::table)
+        .values(&new_user)
+        .returning(Users::as_returning())
+        .get_result(conn)
+        .expect("Error saving new user");
+
+    return Ok(result);
+}
+
+pub fn verify_user(conn: &mut PgConnection, arg_username: &str, arg_password: &str) -> Result<Uuid, &'static str> {
+    use crate::schema::users::dsl::*;
+
+    let response = users.filter(username.eq(arg_username)).select(Users::as_select()).load(conn).expect("Error loading users");
+    let user = response.get(0);
+    let user = match user {
+        Some(user) => user,
+        None => return Err("User not found!")
+    };
+    
+    let encoded_hash = user.password_hash.clone();
+    let vals = encoded_hash.split("$").collect::<Vec<&str>>();
+    let salt = SaltString::from_b64(vals[4]).expect("Failed to decode salt");
+    let argon2 = Argon2::default();
+    let password_hashed = argon2.hash_password(arg_password.as_bytes(), &salt).expect("Failed to hash password!").to_string();
+    if password_hashed == encoded_hash {
+        return Ok(user.id);
+    }
+    return Err("Incorrect password!");
+}
+
+pub fn create_session(conn: &mut PgConnection, arg_user_id: &uuid::Uuid) -> Result<Session, &'static str> {
+    use crate::schema::session;
+
+    let new_session = NewSession {
+        user_id: arg_user_id,
+        expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30), // 30 days till expiration
+    };
+
+    let result = diesel::insert_into(session::table)
+        .values(&new_session)
+        .returning(Session::as_returning())
+        .get_result(conn)
+        .expect("Error saving new session");
+
+    return Ok(result);
+}
