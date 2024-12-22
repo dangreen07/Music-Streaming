@@ -18,5 +18,18 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('daisyui'),
+  ],
+  daisyui: {
+    themes: [
+      "dark",
+      {
+        music_streaming: {
+          "neutral": "#262626",
+        }
+      },
+      "dim"
+    ]
+  }
 } satisfies Config;

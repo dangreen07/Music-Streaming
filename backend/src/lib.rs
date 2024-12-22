@@ -1,5 +1,5 @@
 use argon2::{Argon2, PasswordHasher};
-use diesel::prelude::*;
+use diesel::{prelude::*, result::Error};
 use dotenvy::dotenv;
 use password_hash::{rand_core::OsRng, SaltString};
 use uuid::Uuid;
@@ -56,7 +56,7 @@ pub fn verify_user(conn: &mut PgConnection, arg_username: &str, arg_password: &s
     let user = response.get(0);
     let user = match user {
         Some(user) => user,
-        None => return Err("User not found!")
+        None => return Err("Username or password is incorrect!")
     };
     
     let encoded_hash = user.password_hash.clone();
@@ -67,7 +67,7 @@ pub fn verify_user(conn: &mut PgConnection, arg_username: &str, arg_password: &s
     if password_hashed == encoded_hash {
         return Ok(user.id);
     }
-    return Err("Incorrect password!");
+    return Err("Username or password is incorrect!");
 }
 
 pub fn create_session(conn: &mut PgConnection, arg_user_id: &uuid::Uuid) -> Result<Session, &'static str> {
@@ -85,4 +85,30 @@ pub fn create_session(conn: &mut PgConnection, arg_user_id: &uuid::Uuid) -> Resu
         .expect("Error saving new session");
 
     return Ok(result);
+}
+
+/// Returns true if the session is valid and false if it is not
+/// # Panics
+/// Panics if there is an error with the database connection
+pub fn valid_session(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) -> bool {
+    use crate::schema::session::dsl::*;
+
+    let response = session.filter(id.eq(arg_session_id)).select(Session::as_select()).load(conn).expect("Error loading sessions");
+    let session_var = response.get(0);
+    let session_var = match session_var {
+        Some(session_var) => session_var,
+        None => return false
+    };
+
+    if session_var.expires_at < chrono::Utc::now().naive_utc() {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn invalidate_session(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) -> Result<usize, Error> {
+    use crate::schema::session::dsl::*;
+
+    diesel::delete(session.filter(id.eq(arg_session_id))).execute(conn)
 }
