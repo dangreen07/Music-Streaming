@@ -23,6 +23,7 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - Add a playlist feature
 - Add a favorites feature
 - Database pooling connections on the backend
+- Backend logging of requests
 
 ## Installation
 To install the website, you need to have Docker and Docker Compose installed on your computer.
