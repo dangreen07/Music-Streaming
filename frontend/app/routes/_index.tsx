@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect, useLoaderData } from "@remix-run/react";
 import { hasValidSession } from "../functions/auth.server";
 import Cookies from "js-cookie";
+import { FaBackwardStep, FaForwardStep, FaPause } from "react-icons/fa6";
 
 export const meta: MetaFunction = () => {
   return [
@@ -44,6 +45,24 @@ export default function Index() {
             Cookies.remove("session_id");
             window.location.href = "/";
           }}>Logout</button>
+        </div>
+      </div>
+      <div id="player-section" className="absolute bottom-0 flex flex-col items-center justify-center w-full bg-neutral-900 p-3 gap-2">
+        <div className="flex gap-3 items-center">
+          <button id="prev-btn" className="text-white p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
+            <FaBackwardStep size={32} />
+          </button>
+          <button id="play-pause-btn" className="bg-white text-black p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
+            <FaPause size={32} />
+          </button>
+          <button id="next-btn" className="text-white p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
+            <FaForwardStep size={32} />
+          </button>
+        </div>
+        <div className="flex w-1/2 items-center gap-2">
+          <span id="current-song-time" className="text-white text-md">0:00</span>
+          <progress className="progress w-full" value={50} max="100"></progress>
+          <span id="song-duration" className="text-white text-md">1:00</span>
         </div>
       </div>
     </div>
