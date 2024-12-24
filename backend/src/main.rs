@@ -1,9 +1,8 @@
 use std::path::Path;
 use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use backend::{create_session, create_user, establish_connection, invalidate_session, valid_session, verify_user};
+use backend::{create_session, create_user, establish_connection, get_sample, invalidate_session, valid_session, verify_user};
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
 
 #[derive(Deserialize)]
 struct PostedUser {
@@ -36,7 +35,7 @@ struct SongInfo {
 
 #[get("/sample_info")]
 async fn sample_info() -> impl Responder {
-    let file_path = Path::new("./samples/Crab Rave.wav");
+    let file_path = Path::new("./samples/Lady Gaga - Poker Face.wav");
     let reader = match hound::WavReader::open(file_path) {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),
@@ -53,51 +52,12 @@ async fn sample_info() -> impl Responder {
 #[get("/sample/{sample_number}")]
 async fn samples_endpoint(path: web::Path<u32>) -> impl Responder {
     let sample_number = path.into_inner();
-    // Reading the sample file
-    let file_path = Path::new("./samples/Crab Rave.wav");
-    let mut reader = match hound::WavReader::open(file_path) {
-        Ok(r) => r,
-        Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),
+    
+    let output = get_sample("./samples/Lady Gaga - Poker Face.wav", sample_number);
+    let audio_bytes = match output {
+        Ok(audio_bytes) => audio_bytes,
+        Err(error) => return HttpResponse::InternalServerError().body(error)
     };
-
-    let spec = reader.spec();
-    let sample_rate = spec.sample_rate;
-    let num_channels = spec.channels as usize;
-
-    // 10 seconds of samples
-    let samples_per_segment = sample_rate * 10 * num_channels as u32;
-
-    let mut samples = vec![];
-    let mut current_index = 0;
-    for sample in reader.samples::<i16>() {
-        if current_index >= sample_number * samples_per_segment {
-            match sample {
-                Ok(s) => samples.push(s),
-                Err(_) => return HttpResponse::InternalServerError().body("Error reading samples"),
-            }
-        }
-        current_index += 1;
-
-        if samples.len() >= samples_per_segment as usize {
-            break;
-        }
-    }
-
-    if samples.is_empty() {
-        return HttpResponse::InternalServerError().body("Audio file is empty or too short");
-    }
-
-    // Write the first segment to a new WAV file in memory
-    let mut buffer = Cursor::new(Vec::new());
-    {
-        let mut writer = hound::WavWriter::new(&mut buffer, spec).unwrap();
-        for sample in &samples {
-            writer.write_sample(*sample).unwrap();
-        }
-        writer.finalize().unwrap();
-    }
-
-    let audio_bytes = buffer.into_inner();
 
     HttpResponse::Ok()
         .content_type("audio/wav")

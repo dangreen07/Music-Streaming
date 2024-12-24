@@ -1,10 +1,9 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { useEffect, useState } from "react";
-import { redirect, useLoaderData } from "@remix-run/react";
+import { MetaFunction, redirect, useLoaderData } from "@remix-run/react";
 import Cookies from "js-cookie";
 import { FaBackwardStep, FaForwardStep, FaPause, FaPlay } from "react-icons/fa6";
-import type { MetaFunction } from "@remix-run/node";
-import { hasValidSession } from "~/functions/auth.server";
+import { hasValidSession } from "../functions/auth.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -66,7 +65,6 @@ export default function Index() {
   }
 
   function playAudioChunk(audioBuffer: AudioBuffer, startTime: number) {
-    console.log(gainNode, audioContext);
     if (audioContext === null || gainNode === null)
       return;
     const source = audioContext.createBufferSource();
@@ -76,25 +74,18 @@ export default function Index() {
   }
 
   async function playAudio() {
-    console.log('playAudio');
     if (audioContext === null || audioContext.state === 'closed') {
-      console.log('playAudio: create new context');
       const temp = new AudioContext();
-      // await temp.suspend(); // Start suspended
       const tempGainNode = temp.createGain();
       tempGainNode.gain.value = volumeNum / 100;
       tempGainNode.connect(temp.destination);
       setAudioContext(temp);
       setGainNode(tempGainNode);
     }
-    console.log("State: ", audioContext?.state);
     if (audioContext?.state === 'suspended') {
-      console.log('playAudio: resume');
       await audioContext.resume();
       return;
     }
-    console.log('playAudio: nextSample');
-    // await nextSample(0); // Start from the first sample
   }
 
   function togglePlay() {
@@ -109,15 +100,12 @@ export default function Index() {
   }
 
   async function nextSample(sampleNumber: number) {
-    console.log(sampleNumber);
     // Ensure we are still playing
     if (audioContext === null || audioContext?.state !== 'running') return;
-    console.log('nextSample: GetAudio');
     const audioBuffer = await GetAudio(sampleNumber);
     if (audioBuffer === null) {
       return;
     }
-    console.log('nextSample: decodeAudioChunk');
     const decodedAudioBuffer = await decodeAudioChunk(audioBuffer);
     if (decodedAudioBuffer) {
       playAudioChunk(decodedAudioBuffer, sampleNumber * 10);
@@ -126,6 +114,7 @@ export default function Index() {
 
   useEffect(() => {
     GetSongInfo();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -157,6 +146,7 @@ export default function Index() {
       }
     }, 125);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, audioContext, currentSample]);
 
   return (
@@ -167,7 +157,6 @@ export default function Index() {
         </div>
         <div id="right-side">
           <button className="btn btn-primary btn-md" onClick={async () => {
-            console.log(Cookies.get("session_id"));
             await fetch(environment.server_url + "/logout", {
               method: "POST",
               headers: {
@@ -182,6 +171,9 @@ export default function Index() {
           }}>Logout</button>
         </div>
       </div>
+      <div id="content">
+        
+      </div>
       <div id="player-section" className="absolute bottom-0 flex items-center justify-between w-full bg-neutral-900 px-8 py-3 gap-2">
         <div></div>
         <div className="flex flex-col items-center justify-center gap-2 w-1/2">
@@ -192,9 +184,7 @@ export default function Index() {
             <button
               id="play-pause-btn"
               className="bg-white text-black p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out"
-              onClick={() => {
-                togglePlay();
-              }}
+              onClick={() => togglePlay()}
             >
               {playing ?
                 <FaPause size={32} /> :

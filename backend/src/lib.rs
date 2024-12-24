@@ -3,7 +3,7 @@ use diesel::{prelude::*, result::Error};
 use dotenvy::dotenv;
 use password_hash::{rand_core::OsRng, SaltString};
 use uuid::Uuid;
-use std::env;
+use std::{env, io::Cursor, path::Path};
 
 use crate::models::*;
 
@@ -111,4 +111,53 @@ pub fn invalidate_session(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) 
     use crate::schema::session::dsl::*;
 
     diesel::delete(session.filter(id.eq(arg_session_id))).execute(conn)
+}
+
+pub fn get_sample(song_file_path: &str, sample_number: u32) -> Result<Vec<u8>, &'static str> {
+    let file_path = Path::new(song_file_path);
+    let mut reader = match hound::WavReader::open(file_path) {
+        Ok(r) => r,
+        Err(_) => return Err("Error opening audio file"),
+    };
+
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate;
+    let num_channels = spec.channels as usize;
+
+    // 10 seconds per sample
+    let samples_per_segment = sample_rate * 10 * num_channels as u32;
+
+    let mut samples = vec![];
+    let mut current_index = 0;
+    for sample in reader.samples::<i16>() {
+        if current_index >= sample_number * samples_per_segment {
+            match sample {
+                Ok(s) => samples.push(s),
+                Err(_) => return Err("Error reading samples")
+            }
+        }
+        current_index += 1;
+
+        if samples.len() >= samples_per_segment as usize {
+            break;
+        }
+    }
+
+    if samples.is_empty() {
+        return Err("Audio file is empty or too short");
+    }
+
+    // Write the first segment to a new WAV file in memory
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut writer = hound::WavWriter::new(&mut buffer, spec).unwrap();
+        for sample in &samples {
+            writer.write_sample(*sample).unwrap();
+        }
+        writer.finalize().unwrap();
+    }
+
+    let audio_bytes = buffer.into_inner();
+
+    Ok(audio_bytes)
 }

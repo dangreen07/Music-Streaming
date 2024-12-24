@@ -1,0 +1,24 @@
+name: Deploy to Digital Ocean
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            -   name: executing remote ssh commands using password
+                uses: appleboy/ssh-action@v1.2.0
+                with:
+                    host: ${{ secrets.HOST }}
+                    username: ${{ secrets.USERNAME }}
+                    password: ${{ secrets.PASSWORD }}
+                    port: ${{ secrets.PORT }}
+                    script: 
+                        |
+                        docker-compose stop
+                        cd /root/Music-Streaming
+                        git pull
+                        docker-compose up --build -d
