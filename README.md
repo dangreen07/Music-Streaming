@@ -9,16 +9,18 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - User login
 - Session invalidation (logout)
 - User session management
+- Output the chunks of the audio file
+- Get the current song info
 
 ## Current Features on the frontend
 - Login
 - Sign up
 - Logout
+- Play the audio as a stream
 - Session checking (using cookies)
 
 ## Future Features
 - Use an s3 bucket to store the music files
-- Stream the music files
 - Add a search feature
 - Add a playlist feature
 - Add a favorites feature

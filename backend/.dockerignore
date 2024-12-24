@@ -1,5 +1,4 @@
 target
-samples
 migrations
 .env
 .gitignore
