@@ -36,7 +36,7 @@ struct SongInfo {
 
 #[get("/sample_info")]
 async fn sample_info() -> impl Responder {
-    let file_path = Path::new("./samples/Confidence Man - Holiday (Official Video).wav");
+    let file_path = Path::new("./samples/Crab Rave.wav");
     let reader = match hound::WavReader::open(file_path) {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),
@@ -54,7 +54,7 @@ async fn sample_info() -> impl Responder {
 async fn samples_endpoint(path: web::Path<u32>) -> impl Responder {
     let sample_number = path.into_inner();
     // Reading the sample file
-    let file_path = Path::new("./samples/Confidence Man - Holiday (Official Video).wav");
+    let file_path = Path::new("./samples/Crab Rave.wav");
     let mut reader = match hound::WavReader::open(file_path) {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),

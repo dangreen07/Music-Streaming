@@ -38,7 +38,7 @@ export default function Index() {
   const [currentTime, setCurrentTime] = useState(0);
   const [songDuration, setSongDuration] = useState(1);
   const [playing, setPlaying] = useState(false);
-  const [currentSample, setCurrentSample] = useState(0);
+  const [currentSample, setCurrentSample] = useState(-1);
   const [volumeNum, setVolumeNum] = useState(50);
 
   async function GetSongInfo() {
@@ -66,6 +66,7 @@ export default function Index() {
   }
 
   function playAudioChunk(audioBuffer: AudioBuffer, startTime: number) {
+    console.log(gainNode, audioContext);
     if (audioContext === null || gainNode === null)
       return;
     const source = audioContext.createBufferSource();
@@ -74,20 +75,26 @@ export default function Index() {
     source.start(startTime);
   }
 
-  async function playAudio(first_run: boolean = false) {
+  async function playAudio() {
+    console.log('playAudio');
     if (audioContext === null || audioContext.state === 'closed') {
+      console.log('playAudio: create new context');
       const temp = new AudioContext();
-      temp.suspend(); // Start suspended
+      // await temp.suspend(); // Start suspended
       const tempGainNode = temp.createGain();
       tempGainNode.gain.value = volumeNum / 100;
       tempGainNode.connect(temp.destination);
       setAudioContext(temp);
       setGainNode(tempGainNode);
     }
+    console.log("State: ", audioContext?.state);
     if (audioContext?.state === 'suspended') {
+      console.log('playAudio: resume');
       await audioContext.resume();
+      return;
     }
-    await nextSample(0); // Start from the first sample
+    console.log('playAudio: nextSample');
+    // await nextSample(0); // Start from the first sample
   }
 
   function togglePlay() {
@@ -102,12 +109,15 @@ export default function Index() {
   }
 
   async function nextSample(sampleNumber: number) {
+    console.log(sampleNumber);
     // Ensure we are still playing
-    if (!playing || audioContext === null || audioContext.state !== 'running') return;
+    if (audioContext === null || audioContext?.state !== 'running') return;
+    console.log('nextSample: GetAudio');
     const audioBuffer = await GetAudio(sampleNumber);
     if (audioBuffer === null) {
       return;
     }
+    console.log('nextSample: decodeAudioChunk');
     const decodedAudioBuffer = await decodeAudioChunk(audioBuffer);
     if (decodedAudioBuffer) {
       playAudioChunk(decodedAudioBuffer, sampleNumber * 10);
@@ -139,7 +149,7 @@ export default function Index() {
           setAudioContext(null);
           setGainNode(null);
           setCurrentTime(0);
-          setCurrentSample(0);
+          setCurrentSample(-1);
           setPlaying(false);
         } else {
           setCurrentTime(currentTime);
