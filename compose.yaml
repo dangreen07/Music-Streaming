@@ -12,7 +12,7 @@ services:
     links:
       - "backend:localhost"
     environment:
-      SERVER_URL: "http://localhost:8080"
+      SERVER_URL: ${SERVER_URL}
       SERVER_URL_FROM_SERVER: "http://backend:8080"
 networks:
   default:
