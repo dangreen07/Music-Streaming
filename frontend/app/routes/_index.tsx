@@ -1,9 +1,10 @@
-import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { useEffect, useState } from "react";
 import { redirect, useLoaderData } from "@remix-run/react";
-import { hasValidSession } from "../functions/auth.server";
 import Cookies from "js-cookie";
 import { FaBackwardStep, FaForwardStep, FaPause, FaPlay } from "react-icons/fa6";
-import { useEffect, useState } from "react";
+import type { MetaFunction } from "@remix-run/node";
+import { hasValidSession } from "~/functions/auth.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -33,6 +34,7 @@ function formatTime(seconds: number): string {
 export default function Index() {
   const environment = useLoaderData() as { server_url: string };
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [gainNode, setGainNode] = useState<GainNode | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [songDuration, setSongDuration] = useState(1);
   const [playing, setPlaying] = useState(false);
@@ -64,80 +66,88 @@ export default function Index() {
   }
 
   function playAudioChunk(audioBuffer: AudioBuffer, startTime: number) {
-    if (audioContext === null)
+    if (audioContext === null || gainNode === null)
       return;
     const source = audioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    const gainNode = audioContext?.createGain();
-    if (gainNode)
-    {
-      gainNode.gain.value = 0.5;
-      gainNode.connect(audioContext.destination);
-      source.connect(gainNode);
-    }
+    source.connect(gainNode);
     source.start(startTime);
   }
 
-  async function playAudio() {
-    await nextSample();
+  async function playAudio(first_run: boolean = false) {
+    if (audioContext === null || audioContext.state === 'closed') {
+      const temp = new AudioContext();
+      temp.suspend(); // Start suspended
+      const tempGainNode = temp.createGain();
+      tempGainNode.gain.value = volumeNum / 100;
+      tempGainNode.connect(temp.destination);
+      setAudioContext(temp);
+      setGainNode(tempGainNode);
+    }
+    if (audioContext?.state === 'suspended') {
+      await audioContext.resume();
+    }
+    await nextSample(0); // Start from the first sample
   }
 
   function togglePlay() {
-    if(playing) {
+    if (playing) {
       audioContext?.suspend();
       setPlaying(false);
     }
-    else if (audioContext?.currentTime == 0) {
-      playAudio();
-      setPlaying(true);
-    }
     else {
-      audioContext?.resume();
+      playAudio();
       setPlaying(true);
     }
   }
 
-  async function nextSample(first_run: boolean = false) {
-    setCurrentSample(currentSample + 1);
-    const sample_current = first_run ? 0 : currentSample;
-    console.log("Next sample");
-    const audioBuffer = await GetAudio(sample_current);
+  async function nextSample(sampleNumber: number) {
+    // Ensure we are still playing
+    if (!playing || audioContext === null || audioContext.state !== 'running') return;
+    const audioBuffer = await GetAudio(sampleNumber);
     if (audioBuffer === null) {
       return;
     }
     const decodedAudioBuffer = await decodeAudioChunk(audioBuffer);
     if (decodedAudioBuffer) {
-      playAudioChunk(decodedAudioBuffer, sample_current * 10);
+      playAudioChunk(decodedAudioBuffer, sampleNumber * 10);
     }
   }
 
   useEffect(() => {
-    const temp = new AudioContext();
-    setAudioContext(temp);
     GetSongInfo();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    // Update gain value when volumeNum changes
+    if (gainNode) {
+      gainNode.gain.value = volumeNum / 100;
+    }
+  }, [volumeNum, gainNode]);
+
+  useEffect(() => {
     const interval = setInterval(async () => {
-      const currentTime = audioContext?.currentTime ?? 0;
-      // Check whether next sample needs to be fetched
-      // This fetches the next sample 8 seconds before it is needed
-      if ((currentTime >= currentSample * 10 - 5) && playing) {
-        await nextSample();
+      if (playing && audioContext) {
+        const currentTime = audioContext.currentTime;
+        // Fetch next sample 5 seconds before it's needed
+        if (currentTime >= (currentSample + 1) * 10 - 5) {
+          setCurrentSample(prev => prev + 1);
+          await nextSample(currentSample + 1);
+        }
+        if (currentTime >= songDuration) {
+          await audioContext.close();
+          setAudioContext(null);
+          setGainNode(null);
+          setCurrentTime(0);
+          setCurrentSample(0);
+          setPlaying(false);
+        } else {
+          setCurrentTime(currentTime);
+        }
       }
-      if (currentTime >= songDuration && playing) {
-        audioContext?.close();
-        setCurrentTime(0);
-        setCurrentSample(0);
-        setPlaying(false);
-      }
-      setCurrentTime(currentTime);
     }, 125);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioContext?.currentTime, currentSample]);
+  }, [playing, audioContext, currentSample]);
 
   return (
     <div className="min-h-screen bg-neutral-800 flex flex-grow flex-col w-full">
@@ -175,11 +185,11 @@ export default function Index() {
               onClick={() => {
                 togglePlay();
               }}
-              >
-                {playing ? 
+            >
+              {playing ?
                 <FaPause size={32} /> :
                 <div className="pl-0.5 w-8 h-8"><FaPlay size={32} /></div>
-                }
+              }
             </button>
             <button id="next-btn" className="text-white p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
               <FaForwardStep size={32} />
