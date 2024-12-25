@@ -39,6 +39,7 @@ export default function Index() {
   const [playing, setPlaying] = useState(false);
   const [currentSample, setCurrentSample] = useState(-1);
   const [volumeNum, setVolumeNum] = useState(50);
+  const [loadedSamples, setLoadedSamples] = useState(0); // 0 means no samples have been loaded
 
   async function GetSongInfo() {
     const response = await fetch(environment.server_url + "/sample_info");
@@ -55,6 +56,7 @@ export default function Index() {
       return null;
     }
     const audioBuffer = await response.arrayBuffer();
+    setLoadedSamples(prev => prev + 1);
     return audioBuffer;
   }
 
@@ -101,7 +103,7 @@ export default function Index() {
 
   async function nextSample(sampleNumber: number) {
     // Ensure we are still playing
-    if (audioContext === null || audioContext?.state !== 'running') return;
+    if (audioContext === null) return;
     const audioBuffer = await GetAudio(sampleNumber);
     if (audioBuffer === null) {
       return;
@@ -128,6 +130,13 @@ export default function Index() {
     const interval = setInterval(async () => {
       if (playing && audioContext) {
         const currentTime = audioContext.currentTime;
+        if (currentTime >= loadedSamples * 10) {
+          // The next sample is not loaded yet, so suspend the audio context
+          audioContext.suspend();
+        }
+        else {
+          audioContext.resume();
+        }
         // Fetch next sample 5 seconds before it's needed
         if (currentTime >= (currentSample + 1) * 10 - 5) {
           setCurrentSample(prev => prev + 1);
@@ -147,7 +156,7 @@ export default function Index() {
     }, 125);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, audioContext, currentSample]);
+  }, [playing, audioContext, currentSample, loadedSamples]);
 
   return (
     <div className="min-h-screen bg-neutral-800 flex flex-grow flex-col w-full">
@@ -196,7 +205,7 @@ export default function Index() {
             </button>
           </div>
           <div className="flex w-full items-center gap-2">
-            <span id="current-song-time" className="text-white text-md w-10">{formatTime(currentTime)}</span>
+            <span id="current-song-time" className="text-white text-md w-12">{formatTime(currentTime)}</span>
             <progress className="progress w-full" value={currentTime} max={songDuration}></progress>
             <span id="song-duration" className="text-white text-md">{formatTime(songDuration)}</span>
           </div>

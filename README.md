@@ -11,21 +11,23 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - User session management
 - Output the chunks of the audio file
 - Get the current song info
+- Use an s3 bucket to store the music files
 
 ## Current Features on the frontend
 - Login
 - Sign up
 - Logout
-- Play the audio as a stream
 - Session checking (using cookies)
+- Play the audio as a stream
+- Stopping playback if the next sample is not loaded
 
 ## Future Features
-- Use an s3 bucket to store the music files
 - Add a search feature
 - Add a playlist feature
 - Add a favorites feature
 - Database pooling connections on the backend
 - Backend logging of requests
+- Splitting the files in the s3 bucket into smaller chunks to be loaded
 
 ## Installation
 To install the website, you need to have Docker and Docker Compose installed on your computer.
@@ -34,6 +36,16 @@ The easiest way to install the website is to use the `compose.yaml` file in the 
 
 Before installing the website, you need to set up the environment variables in the `.env` file in the root directory of the project.
 Create an environment variable called `DATABASE_URL` and set it to the postgresql database url.
+You also need to set up the environment variables for the s3 bucket.
+You need to put an environment variable called `SERVER_URL` in the `.env` file in the root directory of the project.
+This variable should be set to the url of the server as accessed from the internet.
+
+Create an environment variable called `DO_ACCESS_KEY_ID` and set it to your access key id.
+Create an environment variable called `DO_SECRET_ACCESS_KEY` and set it to your secret access key.
+Create an environment variable called `DO_REGION` and set it to the region where your s3 bucket is located.
+Create an environment variable called `DO_ENDPOINT` and set it to the endpoint url of your s3 bucket.
+Create an environment variable called `DO_BUCKET_NAME` and set it to the name of your s3 bucket.
+
 Then, you can install the website by running the following command in the root directory of the project:
 ```
 docker compose up --build -d

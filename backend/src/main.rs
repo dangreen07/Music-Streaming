@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::io::Cursor;
 use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use backend::{create_session, create_user, establish_connection, get_sample, invalidate_session, valid_session, verify_user};
+use backend::{create_session, create_user, establish_connection, get_file_from_bucket, get_sample, invalidate_session, valid_session, verify_user};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -33,10 +33,15 @@ struct SongInfo {
     song_duration: u32
 }
 
+const SAMPLE_FILE_NAME: &str = "Crab Rave.wav";
+
 #[get("/sample_info")]
 async fn sample_info() -> impl Responder {
-    let file_path = Path::new("./samples/Lady Gaga - Poker Face.wav");
-    let reader = match hound::WavReader::open(file_path) {
+    let file = get_file_from_bucket(SAMPLE_FILE_NAME).await;
+
+    let reader = Cursor::new(file);
+
+    let reader = match hound::WavReader::new(reader) {
         Ok(r) => r,
         Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),
     };
@@ -52,8 +57,10 @@ async fn sample_info() -> impl Responder {
 #[get("/sample/{sample_number}")]
 async fn samples_endpoint(path: web::Path<u32>) -> impl Responder {
     let sample_number = path.into_inner();
+
+    let file = get_file_from_bucket(SAMPLE_FILE_NAME).await;
     
-    let output = get_sample("./samples/Lady Gaga - Poker Face.wav", sample_number);
+    let output = get_sample(file, sample_number);
     let audio_bytes = match output {
         Ok(audio_bytes) => audio_bytes,
         Err(error) => return HttpResponse::InternalServerError().body(error)

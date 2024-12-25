@@ -3,7 +3,9 @@ use diesel::{prelude::*, result::Error};
 use dotenvy::dotenv;
 use password_hash::{rand_core::OsRng, SaltString};
 use uuid::Uuid;
-use std::{env, io::Cursor, path::Path};
+use std::{env, io::Cursor};
+use aws_config::{BehaviorVersion, Region};
+use aws_sdk_s3::{config::{Builder, Credentials}, Client};
 
 use crate::models::*;
 
@@ -113,9 +115,9 @@ pub fn invalidate_session(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) 
     diesel::delete(session.filter(id.eq(arg_session_id))).execute(conn)
 }
 
-pub fn get_sample(song_file_path: &str, sample_number: u32) -> Result<Vec<u8>, &'static str> {
-    let file_path = Path::new(song_file_path);
-    let mut reader = match hound::WavReader::open(file_path) {
+pub fn get_sample(file: Vec<u8>, sample_number: u32) -> Result<Vec<u8>, &'static str> {
+    let reader = Cursor::new(file);
+    let mut reader = match hound::WavReader::new(reader) {
         Ok(r) => r,
         Err(_) => return Err("Error opening audio file"),
     };
@@ -128,15 +130,12 @@ pub fn get_sample(song_file_path: &str, sample_number: u32) -> Result<Vec<u8>, &
     let samples_per_segment = sample_rate * 10 * num_channels as u32;
 
     let mut samples = vec![];
-    let mut current_index = 0;
-    for sample in reader.samples::<i16>() {
-        if current_index >= sample_number * samples_per_segment {
-            match sample {
-                Ok(s) => samples.push(s),
-                Err(_) => return Err("Error reading samples")
-            }
+    let skip_num = usize::try_from(sample_number * samples_per_segment).unwrap();
+    for sample in reader.samples::<i16>().skip(skip_num) {
+        match sample {
+            Ok(s) => samples.push(s),
+            Err(_) => return Err("Error reading samples")
         }
-        current_index += 1;
 
         if samples.len() >= samples_per_segment as usize {
             break;
@@ -160,4 +159,34 @@ pub fn get_sample(song_file_path: &str, sample_number: u32) -> Result<Vec<u8>, &
     let audio_bytes = buffer.into_inner();
 
     Ok(audio_bytes)
+}
+
+pub async fn get_file_from_bucket(file_name: &str) -> Vec<u8> {
+    dotenv().ok();
+
+    // Environment variables
+    let access_key = env::var("DO_ACCESS_KEY_ID").expect("DO_ACCESS_KEY_ID must be set");
+    let secret_key = env::var("DO_SECRET_ACCESS_KEY").expect("DO_SECRET_ACCESS_KEY must be set");
+    let region = env::var("DO_REGION").expect("DO_REGION must be set");
+    let endpoint = env::var("DO_ENDPOINT").expect("DO_ENDPOINT must be set");
+    let bucket_name = env::var("DO_BUCKET_NAME").expect("DO_BUCKET_NAME must be set");
+
+    let region = Region::new(region);
+
+    let credentials = Credentials::new(access_key, secret_key, None, None, "Digital Ocean");
+    
+    let config = Builder::new()
+        .region(region)
+        .credentials_provider(credentials)
+        .behavior_version(BehaviorVersion::latest())
+        .endpoint_url(endpoint)
+        .build();
+
+    let client = Client::from_conf(config);
+
+    let resp = client.get_object().bucket(bucket_name).key(file_name).send().await.unwrap();
+
+    let output = resp.body.collect().await.unwrap().into_bytes().to_vec();
+
+    output
 }
