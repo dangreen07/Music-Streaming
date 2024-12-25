@@ -29,6 +29,7 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - Backend logging of requests
 - Splitting the files in the s3 bucket into smaller chunks to be loaded
 - Storing information about the songs in the database
+- Admin console
 
 ## Installation
 To install the website, you need to have Docker and Docker Compose installed on your computer.

@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use backend::{create_session, create_user, establish_connection, get_file_from_bucket, get_sample, invalidate_session, valid_session, verify_user};
+use backend::{create_session, create_user, establish_connection, get_file_from_bucket, get_files_from_bucket, get_sample, invalidate_session, valid_session, verify_user};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -33,11 +33,19 @@ struct SongInfo {
     song_duration: u32
 }
 
-const SAMPLE_FILE_NAME: &str = "Crab Rave.wav";
+#[get("/songs_list")]
+async fn songs_list() -> impl Responder {
+    let files = get_files_from_bucket().await;
 
-#[get("/sample_info")]
-async fn sample_info() -> impl Responder {
-    let file = get_file_from_bucket(SAMPLE_FILE_NAME).await;
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .json(files)
+}
+
+#[get("/song_info/{song_name}")]
+async fn song_info(path: web::Path<String>) -> impl Responder {
+    let song_name = path.into_inner();
+    let file = get_file_from_bucket(&song_name).await;
 
     let reader = Cursor::new(file);
 
@@ -54,11 +62,11 @@ async fn sample_info() -> impl Responder {
         .json(output)
 }
 
-#[get("/sample/{sample_number}")]
-async fn samples_endpoint(path: web::Path<u32>) -> impl Responder {
-    let sample_number = path.into_inner();
+#[get("/sample/{song_name}/{sample_number}")]
+async fn samples_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
+    let (song_name, sample_number) = path.into_inner();
 
-    let file = get_file_from_bucket(SAMPLE_FILE_NAME).await;
+    let file = get_file_from_bucket(&song_name).await;
     
     let output = get_sample(file, sample_number);
     let audio_bytes = match output {
@@ -169,7 +177,8 @@ async fn main() -> std::io::Result<()> {
             .service(login)
             .service(validate_session)
             .service(logout)
-            .service(sample_info)
+            .service(song_info)
+            .service(songs_list)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

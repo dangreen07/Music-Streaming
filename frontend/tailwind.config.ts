@@ -23,12 +23,6 @@ export default {
   ],
   daisyui: {
     themes: [
-      "dark",
-      {
-        music_streaming: {
-          "neutral": "#262626",
-        }
-      },
       "dim"
     ]
   }
