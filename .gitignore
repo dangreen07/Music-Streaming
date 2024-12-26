@@ -1,2 +1,3 @@
 .env
 digital-ocean
+backend/diesel.toml

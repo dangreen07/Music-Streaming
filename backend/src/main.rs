@@ -1,67 +1,64 @@
-use std::io::Cursor;
+use std::{collections::HashMap, io::Cursor};
 use actix_cors::Cors;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use backend::{auth::{create_session, create_user, invalidate_session, valid_session, verify_user}, db::establish_connection, spaces::{get_file_from_bucket, get_files_from_bucket, get_sample}};
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize)]
-struct PostedUser {
-    username: String,
-    password: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct SessionReturn {
-    session_id: uuid::Uuid,
-    error: String
-}
-
-#[derive(Serialize, Deserialize)]
-struct SessionInput {
-    session_id: uuid::Uuid
-}
-
-#[derive(Serialize, Deserialize)]
-struct SampleResponse {
-    sample_number: u32,
-    sample: Vec<u8>,
-    song_duration: u32
-}
-
-#[derive(Serialize, Deserialize)]
-struct SongInfo {
-    song_duration: u32
-}
+use actix_web::{
+    get,
+    post,
+    web,
+    App,
+    HttpResponse,
+    HttpServer,
+    Responder
+};
+use backend::{
+    auth::{
+        create_session,
+        create_user,
+        get_user,
+        invalidate_session,
+        valid_session,
+        verify_user
+    }, compress_data, db::establish_connection, models::NewSong, samples::{get_sample, get_song, get_songs_list, insert_song}, spaces::get_file_from_bucket, PostedUser, SessionInput, SessionReturn, SongInfo, UserResponse
+};
+use actix_multipart::Multipart;
+use futures::stream::StreamExt;
+use futures::TryStreamExt;
+use hound::WavReader;
 
 #[get("/songs_list")]
 async fn songs_list() -> impl Responder {
-    let files = get_files_from_bucket().await;
+    let connection = &mut establish_connection();
+    
+    let songs_list = get_songs_list(connection).await;
+
+    let songs_list = match songs_list {
+        Ok(songs_list) => songs_list,
+        Err(_) => return HttpResponse::InternalServerError().body("Error loading songs list")
+    };
 
     HttpResponse::Ok()
         .content_type("application/json")
-        .json(files)
+        .json(songs_list)
 }
 
-#[get("/song_info/{song_name}")]
-async fn song_info(path: web::Path<String>) -> impl Responder {
-    let song_name = path.into_inner();
-    let file = get_file_from_bucket(&song_name).await;
-
-    let reader = Cursor::new(file);
-
-    let reader = match hound::WavReader::new(reader) {
-        Ok(r) => r,
-        Err(_) => return HttpResponse::InternalServerError().body("Error opening audio file"),
+#[get("/song_info/{song_id}")]
+async fn song_info(path: web::Path<uuid::Uuid>) -> impl Responder {
+    let song_id = path.into_inner();
+    let connection = &mut establish_connection();
+    let result = get_song(connection, &song_id).await;
+    let result = match result {
+        Ok(result) => result,
+        Err(error) => return HttpResponse::InternalServerError().body(error)
     };
 
     let output = SongInfo {
-        song_duration: reader.duration() / reader.spec().sample_rate
+        song_duration: u32::try_from(result.duration).unwrap()
     };
     HttpResponse::Ok()
         .content_type("application/json")
         .json(output)
 }
 
+/// Gets a 10 second sample from a song
 #[get("/sample/{song_name}/{sample_number}")]
 async fn samples_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
     let (song_name, sample_number) = path.into_inner();
@@ -76,6 +73,24 @@ async fn samples_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
 
     HttpResponse::Ok()
         .content_type("audio/wav")
+        .body(audio_bytes)
+}
+
+#[get("/sample_compressed/{song_name}/{sample_number}")]
+async fn samples_compressed_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
+    let (song_name, sample_number) = path.into_inner();
+
+    let file = get_file_from_bucket(&song_name).await;
+    
+    let output = get_sample(file, sample_number);
+    let audio_bytes = match output {
+        Ok(audio_bytes) => audio_bytes,
+        Err(error) => return HttpResponse::InternalServerError().body(error)
+    };
+    let audio_bytes = compress_data(audio_bytes);
+
+    HttpResponse::Ok()
+        .content_type("application/zlib")
         .body(audio_bytes)
 }
 
@@ -163,6 +178,82 @@ async fn logout(session_data: web::Json<SessionInput>) -> impl Responder {
     return HttpResponse::Ok();
 }
 
+#[get("/user/{session_id}")]
+async fn users_info(session_data: web::Path<uuid::Uuid>) -> impl Responder {
+    let session_id = session_data.into_inner();
+    let connection = &mut establish_connection();
+    let user = get_user(connection, &session_id);
+    let user = match user {
+        Ok(user) => user,
+        Err(_) => return HttpResponse::InternalServerError().body("Error getting user info")
+    };
+    let user = UserResponse {
+        id: user.id,
+        username: user.username,
+        permissions: user.permissions
+    };
+    return HttpResponse::Ok().json(user);
+}
+
+#[post("/song")]
+async fn add_song(mut payload: Multipart) -> impl Responder {
+    let mut other_fields: HashMap<String, String> = HashMap::new();
+    let mut file_name = String::new();
+    let mut duration = 0;
+
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let field_name = field.name().to_string();
+
+        // If the field is the file, handle separately
+        if field_name == "file" {
+            let content_disposition = field.content_disposition().clone();
+            file_name = content_disposition.get_filename().unwrap_or("file").to_string();
+            
+            // Store the uploaded file
+            let mut file_bytes = web::BytesMut::new();
+            while let Some(chunk) = field.next().await {
+                let data = chunk.unwrap();
+                file_bytes.extend_from_slice(&data);
+            }
+            
+            // Get the duration of the audio file
+            let reader = Cursor::new(file_bytes);
+            let reader = match WavReader::new(reader) {
+                Ok(r) => r,
+                Err(_) => return HttpResponse::BadRequest().body("Invalid audio file"),
+            };
+            duration = (reader.duration() / reader.spec().sample_rate) as i32;
+        } else {
+            // Add other fields to the HashMap
+            let mut value_bytes = web::BytesMut::new();
+            while let Some(chunk) = field.next().await {
+                let data = chunk.unwrap();
+                value_bytes.extend_from_slice(&data);
+            }
+
+            // Interpret bytes as a UTF-8 string and store it
+            let value = String::from_utf8(value_bytes.to_vec()).unwrap_or_default();
+            other_fields.insert(field_name, value);
+        }
+    }
+    // Insert into the database using Diesel
+    let new_song = NewSong {
+        title: other_fields.get("title").unwrap_or(&"Unknown Title".to_string()).to_string(),
+        artist: other_fields.get("artist").unwrap_or(&"Unknown Artist".to_string()).to_string(),
+        album: other_fields.get("album").unwrap_or(&"Unknown Album".to_string()).to_string(),
+        duration,
+        file_path: file_name
+    };
+    let connection = &mut establish_connection();
+    let response = insert_song(connection, new_song).await;
+    let _ = match response {
+        Ok(response) => response,
+        Err(_) => return HttpResponse::InternalServerError().body("Error adding song")
+    };
+
+    HttpResponse::Ok().body("File upload successful")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
@@ -170,6 +261,7 @@ async fn main() -> std::io::Result<()> {
             .allow_any_origin() // Note: This is insecure and should not be used in production
             .allowed_headers(vec!["Content-Type"])
             .allow_any_method();
+
         App::new()
             .wrap(cors)
             .service(samples_endpoint)
@@ -179,6 +271,9 @@ async fn main() -> std::io::Result<()> {
             .service(logout)
             .service(song_info)
             .service(songs_list)
+            .service(users_info)
+            .service(samples_compressed_endpoint)
+            .service(add_song)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

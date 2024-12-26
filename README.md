@@ -58,3 +58,9 @@ Once the containers are running, you can access the website by opening the follo
 ```
 http://localhost:3000
 ```
+
+To add songs to your site you can use the admin console. This admin console is located at the following URL:
+```
+http://localhost:3000/admin
+```
+To access the admin console you need to be logged in as an admin with your permissions set to `admin`.  

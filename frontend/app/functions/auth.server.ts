@@ -31,3 +31,19 @@ export async function hasValidSession(request: Request) {
   }
   return false;
 }
+
+export async function getUser(request: Request): Promise<{ id: string, username: string, permissions: string } | null> {
+  const cookieHeader = request.headers.get("Cookie");
+  if (cookieHeader !== null) {
+    const cookies = parseCookieHeader(cookieHeader);
+    const session = cookies["session_id"];
+    if (session) {
+      const response = await fetch(process.env.SERVER_URL_FROM_SERVER + "/user/" + session, {
+        method: "GET"
+      });
+      const response_body = await response.json() as { id: string, username: string, permissions: string };
+      return response_body;
+    }
+  }
+  return null;
+}

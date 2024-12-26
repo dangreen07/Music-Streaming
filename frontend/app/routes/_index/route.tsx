@@ -1,12 +1,14 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Await, defer, MetaFunction, redirect, useLoaderData } from "@remix-run/react";
-import { hasValidSession } from "../functions/auth.server";
-import NavigationBar from "~/components/NavigationBar";
-import SongPlayer from "~/components/SongPlayer";
-import MainPageContent from "~/components/MainPageContent";
 import { Suspense } from "react";
-import MainPageContentSkeleton from "~/components/MainPageContentSkeleton";
-import SongPlayerSkeleton from "~/components/SongPlayerSkeleton";
+import { getSongsList } from "~/functions/songs.server";
+import { hasValidSession } from "~/functions/auth.server";
+
+import NavigationBar from "./NavigationBar";
+import SongPlayer from "./SongPlayer";
+import MainPageContent from "./MainPageContent";
+import MainPageContentSkeleton from "./MainPageContentSkeleton";
+import SongPlayerSkeleton from "./SongPlayerSkeleton";
 
 export const meta: MetaFunction = () => {
   return [
@@ -15,18 +17,8 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-async function getSongsList(server_url: string) {
-  const response = await fetch(server_url + "/songs_list",
-    {
-        method: "GET"
-    }
-  );
-  const json = await response.json() as string[];
-  return json;
-}
-
-async function getSongInfo(server_url: string, song_name: string) {
-  const response = await fetch(server_url + "/song_info/" + encodeURI(song_name));
+async function getSongInfo(server_url: string, song_id: string) {
+  const response = await fetch(server_url + "/song_info/" + encodeURI(song_id));
   const songInfo = await response.json() as { song_duration: number };
   return songInfo;
 }
@@ -40,8 +32,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (server_url === undefined) {
     throw new Error("SERVER_URL environment variable not set");
   }
-  const songInfo = getSongInfo(server_url, "Crab Rave.wav");
-  const songsList = getSongsList(server_url);
+  const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "52c59667-18d2-4654-95cb-06341e0e0580");
+  const songsList = getSongsList(process.env.SERVER_URL_FROM_SERVER??"");
 
   return defer({
     server_url,
@@ -63,7 +55,7 @@ export default function Index() {
       </Suspense>
       <Suspense fallback={<SongPlayerSkeleton />}>
         <Await resolve={songInfo}>
-          {songInfo => <SongPlayer server_url={server_url} initial_song_duration={songInfo.song_duration} />}
+          {songInfo => <SongPlayer currentSong={"Crab Rave.wav"} server_url={server_url} initial_song_duration={songInfo.song_duration} />}
         </Await>
       </Suspense>
     </div>

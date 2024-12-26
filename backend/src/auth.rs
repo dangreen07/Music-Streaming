@@ -1,6 +1,15 @@
-use argon2::{Argon2, PasswordHasher};
-use diesel::{prelude::*, result::Error};
-use password_hash::{rand_core::OsRng, SaltString};
+use argon2::{
+    Argon2,
+    PasswordHasher
+};
+use diesel::{
+    prelude::*,
+    result::Error
+};
+use password_hash::{
+    rand_core::OsRng,
+    SaltString
+};
 use uuid::Uuid;
 
 use crate::models::*;
@@ -95,4 +104,26 @@ pub fn invalidate_session(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) 
     use crate::schema::session::dsl::*;
 
     diesel::delete(session.filter(id.eq(arg_session_id))).execute(conn)
+}
+
+pub fn get_user(conn: &mut PgConnection, arg_session_id: &uuid::Uuid) -> Result<Users, &'static str> {
+    use crate::schema::{session, users};
+
+    let resp = session::table
+        .inner_join(users::table)
+        .filter(session::id.eq(arg_session_id))
+        .select((Session::as_select(), Users::as_select()))
+        .load::<(Session, Users)>(conn);
+
+    let resp = match resp {
+        Ok(resp) => resp,
+        Err(_) => return Err("Error loading users")
+    };
+    let resp = resp.get(0);
+    let resp = match resp {
+        Some(resp) => resp,
+        None => return Err("Error getting user")
+    };
+    let user = resp.1.clone();
+    return Ok(user);
 }

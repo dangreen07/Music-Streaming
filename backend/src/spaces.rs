@@ -1,54 +1,29 @@
-use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::{config::{Builder, Credentials}, Client};
-use std::{env, io::Cursor};
+use aws_config::{
+    BehaviorVersion,
+    Region
+};
+use aws_sdk_s3::{
+    config::{
+        Builder,
+        Credentials
+    },
+    Client
+};
+use std::env;
 use dotenvy::dotenv;
 
-pub fn get_sample(file: Vec<u8>, sample_number: u32) -> Result<Vec<u8>, &'static str> {
-    let reader = Cursor::new(file);
-    let mut reader = match hound::WavReader::new(reader) {
-        Ok(r) => r,
-        Err(_) => return Err("Error opening audio file"),
-    };
-
-    let spec = reader.spec();
-    let sample_rate = spec.sample_rate;
-    let num_channels = spec.channels as usize;
-
-    // 10 seconds per sample
-    let samples_per_segment = sample_rate * 10 * num_channels as u32;
-
-    let mut samples = vec![];
-    let skip_num = usize::try_from(sample_number * samples_per_segment).unwrap();
-    for sample in reader.samples::<i16>().skip(skip_num) {
-        match sample {
-            Ok(s) => samples.push(s),
-            Err(_) => return Err("Error reading samples")
-        }
-
-        if samples.len() >= samples_per_segment as usize {
-            break;
-        }
-    }
-
-    if samples.is_empty() {
-        return Err("Audio file is empty or too short");
-    }
-
-    // Write the first segment to a new WAV file in memory
-    let mut buffer = Cursor::new(Vec::new());
-    {
-        let mut writer = hound::WavWriter::new(&mut buffer, spec).unwrap();
-        for sample in &samples {
-            writer.write_sample(*sample).unwrap();
-        }
-        writer.finalize().unwrap();
-    }
-
-    let audio_bytes = buffer.into_inner();
-
-    Ok(audio_bytes)
-}
-
+/// Gets a file from a bucket from its file name.
+/// 
+/// # Panics
+/// Will panic if any of the environment variables don't exist in a .env file 
+/// or in the terminal running the programs environment. The environment variables required are listed below:
+/// - `DO_ACCESS_KEY_ID` - This is the access key for the storage bucket
+/// - `DO_SECRET_ACCESS_KEY` - This is the secret access key for the storage bucket
+/// - `DO_REGION` - This is the region of the storage bucket
+/// - `DO_ENDPOINT` - This is the endpoint of the storage bucket
+/// - `DO_BUCKET_NAME` - This is the name of the storage bucket
+/// # Returns
+/// A vector of bytes representing the file `Vec<u8>`
 pub async fn get_file_from_bucket(file_name: &str) -> Vec<u8> {
     dotenv().ok();
 
@@ -72,7 +47,11 @@ pub async fn get_file_from_bucket(file_name: &str) -> Vec<u8> {
 
     let client = Client::from_conf(config);
 
-    let resp = client.get_object().bucket(bucket_name).key(file_name).send().await.unwrap();
+    let resp = client.get_object().bucket(bucket_name).key(file_name).send().await;
+    let resp = match resp {
+        Ok(resp) => resp,
+        Err(_) => panic!("Failed to get object from bucket!")
+    };
 
     let output = resp.body.collect().await.unwrap().into_bytes().to_vec();
 
