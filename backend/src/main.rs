@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use backend::{create_session, create_user, establish_connection, get_file_from_bucket, get_files_from_bucket, get_sample, invalidate_session, valid_session, verify_user};
+use backend::{auth::{create_session, create_user, invalidate_session, valid_session, verify_user}, db::establish_connection, spaces::{get_file_from_bucket, get_files_from_bucket, get_sample}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
