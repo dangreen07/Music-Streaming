@@ -10,7 +10,15 @@ function formatTime(seconds: number): string {
     return `${minutes}:${formattedSeconds}`;
 }
 
-export default function SongPlayer({server_url, currentSong, initial_song_duration: song_duration}: {server_url: string, initial_song_duration: number, currentSong: string}) {
+export default function SongPlayer({
+  server_url,
+  currentSong,
+  initial_song_duration: song_duration,
+}: {
+  server_url: string,
+  initial_song_duration: number,
+  currentSong: string
+}) {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
@@ -18,6 +26,7 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
     const [currentSample, setCurrentSample] = useState(-1);
     const [volumeNum, setVolumeNum] = useState(50);
     const [loadedSamples, setLoadedSamples] = useState(0); // 0 means no samples have been loaded
+    const [songDuration, setSongDuration] = useState(song_duration);
 
     async function GetAudio(sample_number: number = 0) {
       const response = await fetch(server_url + "/sample_compressed/" + encodeURI(currentSong) + "/" + sample_number);
@@ -34,6 +43,12 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
 
       setLoadedSamples(prev => prev + 1);
       return audioBuffer.buffer;
+    }
+
+    async function GetSongInfo() {
+      const response = await fetch(server_url + "/song_info/" + encodeURI(currentSong));
+      const songInfo = await response.json() as { song_duration: number };
+      setSongDuration(songInfo.song_duration);
     }
 
     async function decodeAudioChunk(arrayBuffer: ArrayBuffer) {
@@ -55,6 +70,7 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
       if (audioContext === null || audioContext.state === 'closed') {
           const temp = new AudioContext();
           const tempGainNode = temp.createGain();
+          temp.suspend();
           tempGainNode.gain.value = volumeNum / 100;
           tempGainNode.connect(temp.destination);
           setAudioContext(temp);
@@ -90,6 +106,21 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
       }
     }
 
+    async function stopAudio() {
+      await audioContext?.close();
+      setAudioContext(null);
+      setGainNode(null);
+      setCurrentTime(0);
+      setCurrentSample(-1);
+      setLoadedSamples(0);
+      setPlaying(false);
+    }
+
+    useEffect(() => {
+      stopAudio();
+      GetSongInfo();
+    }, [currentSong]);
+
     useEffect(() => {
       // Update gain value when volumeNum changes
       if (gainNode) {
@@ -100,30 +131,24 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
     useEffect(() => {
       const interval = setInterval(async () => {
           if (playing && audioContext) {
-          const currentTime = audioContext.currentTime;
-          if (currentTime >= loadedSamples * 10) {
-              // The next sample is not loaded yet, so suspend the audio context
-              audioContext.suspend();
-          }
-          else {
-              audioContext.resume();
-          }
-          // Fetch next sample 5 seconds before it's needed
-          if (currentTime >= (currentSample + 1) * 10 - 5) {
-              setCurrentSample(prev => prev + 1);
-              await nextSample(currentSample + 1);
-          }
-          if (currentTime >= song_duration) {
-              await audioContext.close();
-              setAudioContext(null);
-              setGainNode(null);
-              setCurrentTime(0);
-              setCurrentSample(-1);
-              setLoadedSamples(0);
-              setPlaying(false);
-          } else {
-              setCurrentTime(currentTime);
-          }
+            const currentTime = audioContext.currentTime;
+            if (currentTime >= loadedSamples * 10) {
+                // The next sample is not loaded yet, so suspend the audio context
+                audioContext.suspend();
+            }
+            else {
+                audioContext.resume();
+            }
+            // Fetch next sample 5 seconds before it's needed
+            if (currentTime >= (currentSample + 1) * 10 - 5) {
+                setCurrentSample(prev => prev + 1);
+                await nextSample(currentSample + 1);
+            }
+            if (currentTime >= songDuration) {
+                stopAudio();
+            } else {
+                setCurrentTime(currentTime);
+            }
           }
       }, 125);
       return () => clearInterval(interval);
@@ -154,8 +179,8 @@ export default function SongPlayer({server_url, currentSong, initial_song_durati
           </div>
           <div className="flex w-full items-center gap-2">
             <span id="current-song-time" className="text-white text-md w-12">{formatTime(currentTime)}</span>
-            <progress className="progress w-full" value={currentTime} max={song_duration}></progress>
-            <span id="song-duration" className="text-white text-md">{formatTime(song_duration)}</span>
+            <progress className="progress w-full" value={currentTime} max={songDuration}></progress>
+            <span id="song-duration" className="text-white text-md">{formatTime(songDuration)}</span>
           </div>
         </div>
         <div id="right-section" className="flex w-36">

@@ -17,7 +17,22 @@ use backend::{
         invalidate_session,
         valid_session,
         verify_user
-    }, compress_data, db::establish_connection, models::NewSong, samples::{get_sample, get_song, get_songs_list, insert_song}, spaces::get_file_from_bucket, PostedUser, SessionInput, SessionReturn, SongInfo, UserResponse
+    }, compress_data,
+    db::establish_connection,
+    models::NewSong,
+    samples::{
+        get_all_samples,
+        get_sample_from_bucket,
+        get_song,
+        get_songs_list,
+        insert_song
+    },
+    spaces::upload_file_to_bucket,
+    PostedUser,
+    SessionInput,
+    SessionReturn,
+    SongInfo,
+    UserResponse
 };
 use actix_multipart::Multipart;
 use futures::stream::StreamExt;
@@ -59,39 +74,35 @@ async fn song_info(path: web::Path<uuid::Uuid>) -> impl Responder {
 }
 
 /// Gets a 10 second sample from a song
-#[get("/sample/{song_name}/{sample_number}")]
-async fn samples_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
-    let (song_name, sample_number) = path.into_inner();
+#[get("/sample/{song_id}/{sample_number}")]
+async fn samples_endpoint(path: web::Path<(uuid::Uuid, u32)>) -> impl Responder {
+    let (song_id, sample_number) = path.into_inner();
 
-    let file = get_file_from_bucket(&song_name).await;
-    
-    let output = get_sample(file, sample_number);
-    let audio_bytes = match output {
-        Ok(audio_bytes) => audio_bytes,
+    let resp = get_sample_from_bucket(&song_id, sample_number).await;
+    let resp = match resp {
+        Ok(resp) => resp,
         Err(error) => return HttpResponse::InternalServerError().body(error)
     };
-
     HttpResponse::Ok()
         .content_type("audio/wav")
-        .body(audio_bytes)
+        .body(resp)
 }
 
-#[get("/sample_compressed/{song_name}/{sample_number}")]
-async fn samples_compressed_endpoint(path: web::Path<(String, u32)>) -> impl Responder {
-    let (song_name, sample_number) = path.into_inner();
+/// Get a 10 second sample from a song compressed with zlib
+#[get("/sample_compressed/{song_id}/{sample_number}")]
+async fn samples_compressed_endpoint(path: web::Path<(uuid::Uuid, u32)>) -> impl Responder {
+    let (song_id, sample_number) = path.into_inner();
 
-    let file = get_file_from_bucket(&song_name).await;
-    
-    let output = get_sample(file, sample_number);
-    let audio_bytes = match output {
-        Ok(audio_bytes) => audio_bytes,
+    let resp = get_sample_from_bucket(&song_id, sample_number).await;
+    let resp = match resp {
+        Ok(resp) => resp,
         Err(error) => return HttpResponse::InternalServerError().body(error)
     };
-    let audio_bytes = compress_data(audio_bytes);
+    let resp = compress_data(resp);
 
     HttpResponse::Ok()
         .content_type("application/zlib")
-        .body(audio_bytes)
+        .body(resp)
 }
 
 #[post("/signup")]
@@ -200,6 +211,7 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
     let mut other_fields: HashMap<String, String> = HashMap::new();
     let mut file_name = String::new();
     let mut duration = 0;
+    let mut output_samples: Vec<Vec<u8>> = Vec::new();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         let field_name = field.name().to_string();
@@ -217,12 +229,19 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
             }
             
             // Get the duration of the audio file
-            let reader = Cursor::new(file_bytes);
+            let reader = Cursor::new(file_bytes.clone());
             let reader = match WavReader::new(reader) {
                 Ok(r) => r,
                 Err(_) => return HttpResponse::BadRequest().body("Invalid audio file"),
             };
             duration = (reader.duration() / reader.spec().sample_rate) as i32;
+
+            // Get the samples for the audio file
+            let samples = get_all_samples(file_bytes.to_vec());
+            output_samples = match samples {
+                Ok(samples) => samples,
+                Err(_) => return HttpResponse::BadRequest().body("Invalid audio file"),
+            };
         } else {
             // Add other fields to the HashMap
             let mut value_bytes = web::BytesMut::new();
@@ -246,10 +265,20 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
     };
     let connection = &mut establish_connection();
     let response = insert_song(connection, new_song).await;
-    let _ = match response {
+    let added_song = match response {
         Ok(response) => response,
         Err(_) => return HttpResponse::InternalServerError().body("Error adding song")
     };
+    // Upload the samples to the bucket
+    // This may take a while
+    for i in 0..output_samples.len() {
+        let key = format!("{}/{}.wav", added_song.id, i);
+        let current = output_samples.get(i).unwrap().clone();
+        let resp = upload_file_to_bucket(&key, current).await;
+        if resp.is_err() {
+            return HttpResponse::InternalServerError().body("Error uploading samples");
+        }
+    }
 
     HttpResponse::Ok().body("File upload successful")
 }

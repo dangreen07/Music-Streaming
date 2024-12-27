@@ -2,16 +2,19 @@
 This website is a music streaming website that allows users to stream music from their computers. It uses React and TypeScript for the frontend and Rust for the backend.
 
 Currently, the website is in development and is not yet functional.
-The rust backend, currently, sends the entire file to the frontend instead of streamign it.
+The rust backend, currently, sends the entire file to the frontend instead of streaming it.
 
 ## Current Features on the backend
 - User registration
 - User login
 - Session invalidation (logout)
+- Get user info
 - User session management
 - Output the chunks of the audio file
 - Get the current song info
 - Use an s3 bucket to store the music files
+- Storing information about the songs in the database
+- Splitting the files in the s3 bucket into smaller chunks to be loaded
 
 ## Current Features on the frontend
 - Login
@@ -20,6 +23,7 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - Session checking (using cookies)
 - Play the audio as a stream
 - Stopping playback if the next sample is not loaded
+- Admin console
 
 ## Future Features
 - Add a search feature
@@ -27,9 +31,6 @@ The rust backend, currently, sends the entire file to the frontend instead of st
 - Add a favorites feature
 - Database pooling connections on the backend
 - Backend logging of requests
-- Splitting the files in the s3 bucket into smaller chunks to be loaded
-- Storing information about the songs in the database
-- Admin console
 
 ## Installation
 To install the website, you need to have Docker and Docker Compose installed on your computer.

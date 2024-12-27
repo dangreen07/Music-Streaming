@@ -2,7 +2,6 @@ import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { useState } from "react";
 import { getUser } from "~/functions/auth.server";
-import pako from 'pako';
 
 export async function loader({ request }: LoaderFunctionArgs) {
     const user = await getUser(request);
@@ -55,10 +54,10 @@ export default function NewSong() {
             <title>New Song</title>
             <h1 className="text-white text-4xl mx-auto font-bold">New Song</h1>
             <div id="new-song-form" className="flex flex-col gap-4 items-center w-full max-w-2xl mx-auto">
-                <input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Title" />
-                <input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Artist" />
-                <input value={songAlbum} onChange={(e) => setSongAlbum(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Album" />
-                <input onChange={(e) => setSongFiles(e.target.files)} type="file" className="p-4 input input-bordered w-full h-full" placeholder="Song File" />
+                <input disabled={submitDisabled} value={songTitle} onChange={(e) => setSongTitle(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Title" />
+                <input disabled={submitDisabled} value={songArtist} onChange={(e) => setSongArtist(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Artist" />
+                <input disabled={submitDisabled} value={songAlbum} onChange={(e) => setSongAlbum(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Album" />
+                <input disabled={submitDisabled} onChange={(e) => setSongFiles(e.target.files)} type="file" className="p-4 input input-bordered w-full h-full" placeholder="Song File" />
                 <button disabled={songTitle === "" || songArtist === "" || songAlbum === "" || songFiles === null || submitDisabled} onClick={() => UploadFile()} className="btn btn-secondary btn-lg btn-wide">Add Song</button>
             </div>
         </div>

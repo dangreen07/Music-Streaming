@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Await, defer, MetaFunction, redirect, useLoaderData } from "@remix-run/react";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { getSongsList } from "~/functions/songs.server";
 import { hasValidSession } from "~/functions/auth.server";
 
@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (server_url === undefined) {
     throw new Error("SERVER_URL environment variable not set");
   }
-  const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "52c59667-18d2-4654-95cb-06341e0e0580");
+  const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "cca8a072-1840-40f6-a164-67f9be4865a4");
   const songsList = getSongsList(process.env.SERVER_URL_FROM_SERVER??"");
 
   return defer({
@@ -44,18 +44,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const { server_url, songInfo, songsList } = useLoaderData<typeof loader>();
+  const [ currentSongID, setCurrentSongID ] = useState("cca8a072-1840-40f6-a164-67f9be4865a4");
 
   return (
     <div className="min-h-screen bg-neutral-800 flex flex-grow flex-col w-full">
       <NavigationBar server_url={server_url} />
       <Suspense fallback={<MainPageContentSkeleton />}>
         <Await resolve={songsList}>
-          {songsList => <MainPageContent songsList={songsList} />}
+          {songsList => <MainPageContent songsList={songsList} setCurrentSongID={setCurrentSongID} />}
         </Await>
       </Suspense>
       <Suspense fallback={<SongPlayerSkeleton />}>
         <Await resolve={songInfo}>
-          {songInfo => <SongPlayer currentSong={"Crab Rave.wav"} server_url={server_url} initial_song_duration={songInfo.song_duration} />}
+          {/* Here currentSong is the id of the song */}
+          {songInfo => <SongPlayer 
+            currentSong={currentSongID}
+            server_url={server_url}
+            initial_song_duration={songInfo.song_duration}
+          />}
         </Await>
       </Suspense>
     </div>
