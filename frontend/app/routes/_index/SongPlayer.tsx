@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaBackwardStep, FaForwardStep, FaPause, FaPlay } from "react-icons/fa6";
 import pako from 'pako';
 
@@ -27,6 +27,7 @@ export default function SongPlayer({
     const [volumeNum, setVolumeNum] = useState(50);
     const [loadedSamples, setLoadedSamples] = useState(0); // 0 means no samples have been loaded
     const [songDuration, setSongDuration] = useState(song_duration);
+    const audioElement = useRef<HTMLAudioElement>(null);
 
     async function GetAudio(sample_number: number = 0) {
       const response = await fetch(server_url + "/sample_compressed/" + encodeURI(currentSong) + "/" + sample_number);
@@ -68,15 +69,30 @@ export default function SongPlayer({
 
     async function playAudio() {
       if (audioContext === null || audioContext.state === 'closed') {
-          const temp = new AudioContext();
-          const tempGainNode = temp.createGain();
-          temp.suspend();
+          const tempAudioContext = new AudioContext();
+          const tempGainNode = tempAudioContext.createGain();
+          // Set the initial volume of the audio
           tempGainNode.gain.value = volumeNum / 100;
-          tempGainNode.connect(temp.destination);
-          setAudioContext(temp);
+
+          // Create a MediaStreamAudioDestinationNode
+          const destination = tempAudioContext.createMediaStreamDestination();
+
+          // Suspend the audio context so that we have the first sample before playing
+          tempAudioContext.suspend();
+          
+          tempGainNode.connect(destination);
+
+          // Connect the audio element to the MediaStreamAudioDestinationNode
+          if (audioElement.current) {
+            audioElement.current.srcObject = destination.stream;
+            audioElement.current?.pause();
+          }
+
+          setAudioContext(tempAudioContext);
           setGainNode(tempGainNode);
       }
       if (audioContext?.state === 'suspended') {
+          audioElement.current?.play();
           await audioContext.resume();
           return;
       }
@@ -84,6 +100,7 @@ export default function SongPlayer({
 
     function togglePlay() {
       if (playing) {
+          audioElement.current?.pause();
           audioContext?.suspend();
           setPlaying(false);
       }
@@ -106,16 +123,17 @@ export default function SongPlayer({
       }
     }
 
-    async function stopAudio() {
+    async function stopAudio(playing: boolean = false) {
       await audioContext?.close();
       setAudioContext(null);
       setGainNode(null);
       setCurrentTime(0);
       setCurrentSample(-1);
       setLoadedSamples(0);
-      setPlaying(false);
+      setPlaying(playing);
     }
 
+    // Stop audio when the song changes
     useEffect(() => {
       stopAudio();
       GetSongInfo();
@@ -133,10 +151,12 @@ export default function SongPlayer({
           if (playing && audioContext) {
             const currentTime = audioContext.currentTime;
             if (currentTime >= loadedSamples * 10) {
+                audioElement.current?.pause();
                 // The next sample is not loaded yet, so suspend the audio context
                 audioContext.suspend();
             }
             else {
+                audioElement.current?.play();
                 audioContext.resume();
             }
             // Fetch next sample 5 seconds before it's needed
@@ -163,6 +183,7 @@ export default function SongPlayer({
             <button id="prev-btn" className="text-white p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
               <FaBackwardStep size={32} />
             </button>
+            <audio ref={audioElement} id="audio-element" />
             <button
               id="play-pause-btn"
               className="bg-white text-black p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out"
