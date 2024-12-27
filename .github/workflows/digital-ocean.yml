@@ -19,7 +19,6 @@ jobs:
                     command_timeout: 45m
                     script: 
                         |
-                        docker-compose stop
                         cd /root/Music-Streaming
                         git pull
                         docker-compose up --build -d

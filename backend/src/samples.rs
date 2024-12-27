@@ -161,17 +161,26 @@ pub async fn insert_song(conn: &mut PgConnection, song: NewSong) -> Result<Songs
 
 pub async fn delete_song_from_server(conn: &mut PgConnection, song_id: &uuid::Uuid) -> Result<&'static str, &'static str> {
     use crate::schema::songs::dsl::*;
+
+    let response = songs.filter(id.eq(song_id)).select(Songs::as_select()).load(conn);
+    let response = match response {
+        Ok(response) => response,
+        Err(_) => return Err("Error loading songs")
+    };
+    let response = response.get(0);
+    let response = match response {
+        Some(response) => response,
+        None => return Err("Error loading song")
+    };
+    let sample_num = response.num_samples;
+
     diesel::delete(songs.filter(id.eq(song_id))).execute(conn).expect("Error deleting song");
-    let mut i = 0;
-    let mut valid = true;
-    while valid {
+    for i in 0..sample_num {
         let response = delete_file_from_bucket(format!("{}/{}.wav", song_id, i)).await;
-        let response = match response {
+        match response {
             Ok(_) => true,
-            Err(_) => false
+            Err(_) => return Err("Error deleting samples")
         };
-        valid = response;
-        i += 1;
     }
 
     Ok("Song deleted successfully")

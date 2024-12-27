@@ -24,10 +24,11 @@ export default function NewSong() {
     const [songArtist, setSongArtist] = useState("");
     const [songAlbum, setSongAlbum] = useState("");
     const [songFiles, setSongFiles] = useState<FileList | null>(null);
+    const [songImage, setSongImage] = useState<FileList | null>(null);
     const [submitDisabled, setSubmitDisabled] = useState(false);
 
     async function UploadFile() {
-        if (songTitle === "" || songArtist === "" || songAlbum === "" || songFiles === null) {
+        if (songTitle === "" || songArtist === "" || songAlbum === "" || songFiles === null || songImage === null) {
             return;
         }
         setSubmitDisabled(true);
@@ -36,6 +37,7 @@ export default function NewSong() {
         formData.append("artist", songArtist);
         formData.append("album", songAlbum);
         formData.append("file", songFiles[0]);
+        formData.append("image", songImage[0]);
         const response = await fetch(server_url + "/song", {
             method: "POST",
             body: formData
@@ -57,9 +59,16 @@ export default function NewSong() {
                 <input disabled={submitDisabled} value={songTitle} onChange={(e) => setSongTitle(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Title" />
                 <input disabled={submitDisabled} value={songArtist} onChange={(e) => setSongArtist(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Artist" />
                 <input disabled={submitDisabled} value={songAlbum} onChange={(e) => setSongAlbum(e.target.value)} type="text" className="input input-bordered w-full" placeholder="Song Album" />
-                <input disabled={submitDisabled} onChange={(e) => setSongFiles(e.target.files)} type="file" className="p-4 input input-bordered w-full h-full" placeholder="Song File" />
+                <div className="flex flex-col gap-0.5 w-full">
+                    <span className="text-lg font-semibold">Album Cover:</span>
+                    <input disabled={submitDisabled} onChange={(e) => setSongImage(e.target.files)} type="file" className="p-4 input input-bordered w-full h-full" placeholder="Song Image" />
+                </div>
+                <div className="flex flex-col gap-0.5 w-full">
+                    <span className="text-lg font-semibold">Song File:</span>
+                    <input disabled={submitDisabled} onChange={(e) => setSongFiles(e.target.files)} type="file" className="p-4 input input-bordered w-full h-full" placeholder="Song File" />
+                </div>
                 <button disabled={songTitle === "" || songArtist === "" || songAlbum === "" || songFiles === null || submitDisabled} onClick={() => UploadFile()} className="btn btn-secondary btn-lg btn-wide">Add Song</button>
             </div>
         </div>
-    )
+    );
 }

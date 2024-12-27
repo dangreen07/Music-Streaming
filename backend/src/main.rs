@@ -1,4 +1,7 @@
-use std::{collections::HashMap, io::Cursor};
+use std::{
+    collections::HashMap,
+    io::Cursor
+};
 use actix_cors::Cors;
 use actix_web::{
     delete, get, post, web, App, HttpResponse, HttpServer, Responder
@@ -17,7 +20,7 @@ use backend::{
     samples::{
         delete_song_from_server, get_all_samples, get_sample_from_bucket, get_song, get_songs_list, insert_song
     },
-    spaces::upload_file_to_bucket,
+    spaces::{get_file_from_bucket, upload_file_to_bucket},
     PostedUser,
     SessionInput,
     SessionReturn,
@@ -28,6 +31,7 @@ use actix_multipart::Multipart;
 use futures::stream::StreamExt;
 use futures::TryStreamExt;
 use hound::WavReader;
+use image::{ImageFormat, ImageReader};
 
 #[get("/songs_list")]
 async fn songs_list() -> impl Responder {
@@ -43,6 +47,20 @@ async fn songs_list() -> impl Responder {
     HttpResponse::Ok()
         .content_type("application/json")
         .json(songs_list)
+}
+
+#[get("/song_image/{song_id}")]
+async fn song_image(path: web::Path<uuid::Uuid>) -> impl Responder {
+    let song_id = path.into_inner();
+    let key = format!("{0}/{0}.png", song_id);
+    let file = get_file_from_bucket(&key).await;
+    let file = match file {
+        Ok(file) => file,
+        Err(_) => return HttpResponse::NotFound().body("Error loading song image")
+    };
+    HttpResponse::Ok()
+        .content_type("image/png")
+        .body(file)
 }
 
 #[get("/song_info/{song_id}")]
@@ -201,6 +219,7 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
     let mut other_fields: HashMap<String, String> = HashMap::new();
     let mut duration = 0;
     let mut output_samples: Vec<Vec<u8>> = Vec::new();
+    let mut album_cover: Vec<u8> = Vec::new();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         let field_name = field.name().to_string();
@@ -228,7 +247,17 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
                 Ok(samples) => samples,
                 Err(_) => return HttpResponse::BadRequest().body("Invalid audio file"),
             };
-        } else {
+        }
+        else if field_name == "image" {
+            // Store the uploaded image
+            let mut file_bytes = web::BytesMut::new();
+            while let Some(chunk) = field.next().await {
+                let data = chunk.unwrap();
+                file_bytes.extend_from_slice(&data);
+            }
+            album_cover = file_bytes.to_vec();
+        }
+        else {
             // Add other fields to the HashMap
             let mut value_bytes = web::BytesMut::new();
             while let Some(chunk) = field.next().await {
@@ -249,12 +278,36 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
         duration,
         num_samples: output_samples.len() as i32
     };
+
     let connection = &mut establish_connection();
     let response = insert_song(connection, new_song).await;
     let added_song = match response {
         Ok(response) => response,
         Err(_) => return HttpResponse::InternalServerError().body("Error adding song")
     };
+    // Upload the album cover to the bucket
+    let image = ImageReader::new(Cursor::new(album_cover)).with_guessed_format();
+    let image = match image {
+        Ok(image) => image,
+        Err(_) => return HttpResponse::InternalServerError().body("Error reading album cover")
+    };
+    let image = image.decode();
+    let image = match image {
+        Ok(image) => image,
+        Err(_) => return HttpResponse::InternalServerError().body("Error decoding album cover")
+    };
+    let mut png_data: Vec<u8> = Vec::new();
+    let resp = image.write_to(&mut Cursor::new(&mut png_data), ImageFormat::Png);
+    match resp {
+        Ok(_) => {},
+        Err(_) => return HttpResponse::InternalServerError().body("Error uploading album cover")
+    };
+    let key = format!("{0}/{0}.png", added_song.id);
+    let resp = upload_file_to_bucket(&key, png_data).await;
+    if resp.is_err() {
+        return HttpResponse::InternalServerError().body("Error uploading album cover");
+    }
+
     // Upload the samples to the bucket
     // This may take a while
     for i in 0..output_samples.len() {
@@ -302,6 +355,7 @@ async fn main() -> std::io::Result<()> {
             .service(samples_compressed_endpoint)
             .service(add_song)
             .service(delete_song)
+            .service(song_image)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

@@ -51,9 +51,10 @@ export default function Index() {
       <NavigationBar server_url={server_url} />
       <Suspense fallback={<MainPageContentSkeleton />}>
         <Await resolve={songsList}>
-          {songsList => <MainPageContent songsList={songsList} setCurrentSongID={setCurrentSongID} />}
+          {songsList => <MainPageContent server_url={server_url} songsList={songsList} setCurrentSongID={setCurrentSongID} />}
         </Await>
       </Suspense>
+      <div id="padding" className="h-28" />
       <Suspense fallback={<SongPlayerSkeleton />}>
         <Await resolve={songInfo}>
           {/* Here currentSong is the id of the song */}

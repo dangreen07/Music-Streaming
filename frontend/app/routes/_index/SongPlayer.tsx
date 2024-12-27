@@ -156,7 +156,7 @@ export default function SongPlayer({
     }, [playing, audioContext, currentSample, loadedSamples]);
 
     return (
-        <div id="player-section" className="absolute bottom-0 flex items-center justify-between w-full bg-neutral-900 px-8 py-3 gap-2">
+        <div id="player-section" className="fixed bottom-0 flex items-center justify-between w-full bg-neutral-900 px-8 py-3 gap-2">
         <div className="w-36"></div>
         <div className="flex flex-col items-center justify-center gap-2 w-1/2">
           <div className="flex gap-3 items-center">
