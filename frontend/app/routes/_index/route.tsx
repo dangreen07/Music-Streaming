@@ -4,11 +4,11 @@ import { Suspense, useState } from "react";
 import { getSongsList } from "~/functions/songs.server";
 import { hasValidSession } from "~/functions/auth.server";
 
-import NavigationBar from "./NavigationBar";
 import SongPlayer from "./SongPlayer";
 import MainPageContent from "./MainPageContent";
 import MainPageContentSkeleton from "./MainPageContentSkeleton";
 import SongPlayerSkeleton from "./SongPlayerSkeleton";
+import NavigationBar from "~/components/NavigationBar";
 
 export const meta: MetaFunction = () => {
   return [
@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (server_url === undefined) {
     throw new Error("SERVER_URL environment variable not set");
   }
-  const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "cca8a072-1840-40f6-a164-67f9be4865a4");
+  const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "5ba801e5-ab4d-48f8-9947-66ee7b63e861");
   const songsList = getSongsList(process.env.SERVER_URL_FROM_SERVER??"");
 
   return defer({
@@ -44,7 +44,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const { server_url, songInfo, songsList } = useLoaderData<typeof loader>();
-  const [ currentSongID, setCurrentSongID ] = useState("cca8a072-1840-40f6-a164-67f9be4865a4");
+  const [ currentSongID, setCurrentSongID ] = useState("5ba801e5-ab4d-48f8-9947-66ee7b63e861");
 
   return (
     <div className="min-h-screen bg-neutral-800 flex flex-grow flex-col w-full">

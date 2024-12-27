@@ -46,7 +46,7 @@ pub struct Songs {
     pub artist: String,
     pub album: String,
     pub duration: i32,
-    pub file_path: String,
+    pub num_samples: i32
 }
 
 #[derive(Insertable)]
@@ -56,5 +56,5 @@ pub struct NewSong {
     pub artist: String,
     pub album: String,
     pub duration: i32,
-    pub file_path: String,
+    pub num_samples: i32
 }

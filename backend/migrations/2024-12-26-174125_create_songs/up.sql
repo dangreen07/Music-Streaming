@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS songs (
     artist VARCHAR NOT NULL,
     album VARCHAR NOT NULL,
     duration INT NOT NULL,
-    file_path VARCHAR NOT NULL
+    num_samples INT NOT NULL
 )

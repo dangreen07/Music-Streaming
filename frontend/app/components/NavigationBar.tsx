@@ -4,7 +4,9 @@ export default function NavigationBar({ server_url }: { server_url: string }) {
     return (
     <div id="navbar" className="flex items-center justify-between w-full bg-neutral-900 p-3">
         <div id="left-side">
-          <img src="/logo-removebg.png" alt="logo" className="h-16 w-16" />
+          <button className="btn btn-ghost btn-lg btn-square" onClick={() => window.location.href = "/"}>
+            <img src="/logo-removebg.png" alt="logo" className="h-16 w-16" />
+          </button>
         </div>
         <div id="right-side">
           <button className="btn btn-primary btn-md" onClick={async () => {

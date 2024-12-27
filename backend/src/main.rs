@@ -1,13 +1,7 @@
 use std::{collections::HashMap, io::Cursor};
 use actix_cors::Cors;
 use actix_web::{
-    get,
-    post,
-    web,
-    App,
-    HttpResponse,
-    HttpServer,
-    Responder
+    delete, get, post, web, App, HttpResponse, HttpServer, Responder
 };
 use backend::{
     auth::{
@@ -21,11 +15,7 @@ use backend::{
     db::establish_connection,
     models::NewSong,
     samples::{
-        get_all_samples,
-        get_sample_from_bucket,
-        get_song,
-        get_songs_list,
-        insert_song
+        delete_song_from_server, get_all_samples, get_sample_from_bucket, get_song, get_songs_list, insert_song
     },
     spaces::upload_file_to_bucket,
     PostedUser,
@@ -209,7 +199,6 @@ async fn users_info(session_data: web::Path<uuid::Uuid>) -> impl Responder {
 #[post("/song")]
 async fn add_song(mut payload: Multipart) -> impl Responder {
     let mut other_fields: HashMap<String, String> = HashMap::new();
-    let mut file_name = String::new();
     let mut duration = 0;
     let mut output_samples: Vec<Vec<u8>> = Vec::new();
 
@@ -218,9 +207,6 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
 
         // If the field is the file, handle separately
         if field_name == "file" {
-            let content_disposition = field.content_disposition().clone();
-            file_name = content_disposition.get_filename().unwrap_or("file").to_string();
-            
             // Store the uploaded file
             let mut file_bytes = web::BytesMut::new();
             while let Some(chunk) = field.next().await {
@@ -261,7 +247,7 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
         artist: other_fields.get("artist").unwrap_or(&"Unknown Artist".to_string()).to_string(),
         album: other_fields.get("album").unwrap_or(&"Unknown Album".to_string()).to_string(),
         duration,
-        file_path: file_name
+        num_samples: output_samples.len() as i32
     };
     let connection = &mut establish_connection();
     let response = insert_song(connection, new_song).await;
@@ -281,6 +267,18 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
     }
 
     HttpResponse::Ok().body("File upload successful")
+}
+
+#[delete("/song/{song_id}")]
+async fn delete_song(path: web::Path::<uuid::Uuid>) -> impl Responder {
+    let song_id = path.into_inner();
+    let connection = &mut establish_connection();
+    let response = delete_song_from_server(connection, &song_id).await;
+    let response = match response {
+        Ok(response) => response,
+        Err(_) => return HttpResponse::InternalServerError().body("Error deleting song")
+    };
+    HttpResponse::Ok().body(response)
 }
 
 #[actix_web::main]
@@ -303,6 +301,7 @@ async fn main() -> std::io::Result<()> {
             .service(users_info)
             .service(samples_compressed_endpoint)
             .service(add_song)
+            .service(delete_song)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

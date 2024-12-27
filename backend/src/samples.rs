@@ -6,7 +6,7 @@ use hound::{
     WavWriter
 };
 
-use crate::{models::*, spaces::get_file_from_bucket};
+use crate::{models::*, spaces::{delete_file_from_bucket, get_file_from_bucket}};
 
 pub fn get_sample(file: Vec<u8>, sample_number: u32) -> Result<Vec<u8>, &'static str> {
     let reader = Cursor::new(file);
@@ -157,4 +157,22 @@ pub async fn insert_song(conn: &mut PgConnection, song: NewSong) -> Result<Songs
     };
 
     return Ok(result);
+}
+
+pub async fn delete_song_from_server(conn: &mut PgConnection, song_id: &uuid::Uuid) -> Result<&'static str, &'static str> {
+    use crate::schema::songs::dsl::*;
+    diesel::delete(songs.filter(id.eq(song_id))).execute(conn).expect("Error deleting song");
+    let mut i = 0;
+    let mut valid = true;
+    while valid {
+        let response = delete_file_from_bucket(format!("{}/{}.wav", song_id, i)).await;
+        let response = match response {
+            Ok(_) => true,
+            Err(_) => false
+        };
+        valid = response;
+        i += 1;
+    }
+
+    Ok("Song deleted successfully")
 }

@@ -15,7 +15,7 @@ diesel::table! {
         artist -> Varchar,
         album -> Varchar,
         duration -> Int4,
-        file_path -> Varchar,
+        num_samples -> Int4
     }
 }
 
