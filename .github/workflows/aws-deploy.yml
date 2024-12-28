@@ -1,4 +1,4 @@
-name: Deploy to Digital Ocean
+name: Deploy to Server
 
 on:
     push:
@@ -16,6 +16,7 @@ jobs:
                     username: ${{ secrets.USERNAME }}
                     key: ${{ secrets.SSH_KEY }}
                     port: ${{ secrets.PORT }}
+                    # This command may take a while to compile the rust code
                     command_timeout: 45m
                     script: 
                         |
