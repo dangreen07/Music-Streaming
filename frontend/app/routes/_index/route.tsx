@@ -32,18 +32,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (server_url === undefined) {
     throw new Error("SERVER_URL environment variable not set");
   }
+  const cloudFrontUrl = process.env.CLOUDFRONT_URL;
+  if (cloudFrontUrl === undefined) {
+    throw new Error("CLOUDFRONT_URL environment variable not set");
+  }
   const songInfo = getSongInfo(process.env.SERVER_URL_FROM_SERVER??"", "5ba801e5-ab4d-48f8-9947-66ee7b63e861");
   const songsList = getSongsList(process.env.SERVER_URL_FROM_SERVER??"");
 
   return defer({
     server_url,
     songInfo,
-    songsList: songsList
+    songsList: songsList,
+    cloudFrontUrl
   });
 };
 
 export default function Index() {
-  const { server_url, songInfo, songsList } = useLoaderData<typeof loader>();
+  const { server_url, songInfo, songsList, cloudFrontUrl } = useLoaderData<typeof loader>();
   const [ currentSongID, setCurrentSongID ] = useState("5ba801e5-ab4d-48f8-9947-66ee7b63e861");
 
   return (
@@ -51,7 +56,7 @@ export default function Index() {
       <NavigationBar server_url={server_url} />
       <Suspense fallback={<MainPageContentSkeleton />}>
         <Await resolve={songsList}>
-          {songsList => <MainPageContent server_url={server_url} songsList={songsList} setCurrentSongID={setCurrentSongID} />}
+          {songsList => <MainPageContent cloudFrontUrl={cloudFrontUrl} songsList={songsList} setCurrentSongID={setCurrentSongID} />}
         </Await>
       </Suspense>
       <div id="padding" className="h-28" />

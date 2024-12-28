@@ -9,16 +9,16 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         steps:
-            -   name: executing remote ssh commands using password
+            -   name: executing remote ssh commands
                 uses: appleboy/ssh-action@v1.2.0
                 with:
                     host: ${{ secrets.HOST }}
                     username: ${{ secrets.USERNAME }}
-                    password: ${{ secrets.PASSWORD }}
+                    key: ${{ secrets.SSH_KEY }}
                     port: ${{ secrets.PORT }}
                     command_timeout: 45m
                     script: 
                         |
-                        cd /root/Music-Streaming
+                        cd /home/ubuntu/Music-Streaming
                         git pull
-                        docker-compose up --build -d
+                        sudo docker compose up --build -d
