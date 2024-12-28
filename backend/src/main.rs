@@ -18,7 +18,7 @@ use backend::{
     db::establish_connection,
     models::NewSong,
     samples::{
-        delete_song_from_server, get_all_samples, get_sample_from_bucket, get_song, get_songs_list, insert_song
+        delete_song_from_server, get_all_samples, get_sample_from_bucket, get_song, get_songs_list, insert_song, mp3_to_wav
     },
     spaces::{get_file_from_bucket, upload_file_to_bucket},
     PostedUser,
@@ -226,11 +226,20 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
 
         // If the field is the file, handle separately
         if field_name == "file" {
+            let content_type = format!("{}", &mut field.content_type().essence_str());
+            let mut file_bytes = Vec::new();
             // Store the uploaded file
-            let mut file_bytes = web::BytesMut::new();
             while let Some(chunk) = field.next().await {
                 let data = chunk.unwrap();
                 file_bytes.extend_from_slice(&data);
+            }
+            if content_type == "audio/mpeg" {
+                // If the file is an mp3, convert it to wav
+                let wav_bytes = mp3_to_wav(file_bytes);
+                file_bytes = match wav_bytes {
+                    Ok(wav_bytes) => wav_bytes,
+                    Err(err) => return HttpResponse::BadRequest().body(err.to_string()),
+                };
             }
             
             // Get the duration of the audio file
@@ -242,10 +251,10 @@ async fn add_song(mut payload: Multipart) -> impl Responder {
             duration = (reader.duration() / reader.spec().sample_rate) as i32;
 
             // Get the samples for the audio file
-            let samples = get_all_samples(file_bytes.to_vec());
+            let samples = get_all_samples(file_bytes);
             output_samples = match samples {
                 Ok(samples) => samples,
-                Err(_) => return HttpResponse::BadRequest().body("Invalid audio file"),
+                Err(_) => return HttpResponse::BadRequest().body("Unable to get samples"),
             };
         }
         else if field_name == "image" {

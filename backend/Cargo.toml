@@ -21,3 +21,4 @@ aws-sdk-s3 = "1.66.0"
 tokio = { version = "1", features = ["full"] }
 flate2 = "1.0.35"
 image = "0.25.5"
+rodio = "0.17.1"

@@ -2,9 +2,10 @@ use std::io::Cursor;
 
 use diesel::prelude::*;
 use hound::{
-    WavReader,
-    WavWriter
+    WavReader, WavSpec, WavWriter
 };
+use rodio::Decoder;
+use rodio::Source;
 
 use crate::{models::*, spaces::{delete_file_from_bucket, get_file_from_bucket}};
 
@@ -184,4 +185,41 @@ pub async fn delete_song_from_server(conn: &mut PgConnection, song_id: &uuid::Uu
     }
 
     Ok("Song deleted successfully")
+}
+
+pub fn mp3_to_wav(mp3_bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Create a Cursor for in-memory MP3 bytes
+    let mp3_cursor = Cursor::new(mp3_bytes);
+
+    // Decode MP3 bytes into a Rodio Source
+    let source = Decoder::new(mp3_cursor);
+    let source = match source {
+        Ok(source) => source,
+        Err(_) => return Err("Error decoding MP3 file".into())
+    };
+
+    // Create an in-memory buffer for WAV bytes
+    let mut wav_buffer = Cursor::new(Vec::new());
+
+    // Set up WAV writer with appropriate specifications
+    let spec = WavSpec {
+        channels: source.channels() as u16,
+        sample_rate: source.sample_rate(),
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int
+    };
+
+    let mut wav_writer = WavWriter::new(&mut wav_buffer, spec)?;
+
+    // Write decoded samples into the WAV writer
+    for sample in source.convert_samples::<i16>() {
+        wav_writer.write_sample(sample)?;
+    }
+
+    // Finalize the WAV file
+    wav_writer.finalize()?;
+
+    // Retrieve the WAV data as a vector of bytes
+    let wav_bytes = wav_buffer.into_inner();
+    Ok(wav_bytes)
 }
