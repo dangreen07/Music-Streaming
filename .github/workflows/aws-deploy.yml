@@ -11,15 +11,12 @@ env:
 
 jobs:
     build-and-push-backend-image:
-        runs-on: ${{ matrix.builder }}
+        runs-on: ubuntu-latest
         strategy:
           fail-fast: false
           matrix:
-            include:
-              - builder: ubuntu-latest
-                platform: linux/amd64
-              - builder: ubuntu-22.04-arm
-                platform: linux/arm64
+                platform:
+                - linux/arm64
         permissions:
             contents: read
             packages: write
