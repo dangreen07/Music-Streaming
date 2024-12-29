@@ -18,7 +18,7 @@ jobs:
             include:
               - builder: ubuntu-latest
                 platform: linux/amd64
-              - builder: buildjet-8vcpu-ubuntu-2204-arm
+              - builder: ubuntu-22.04-arm
                 platform: linux/arm64
         permissions:
             contents: read
@@ -64,7 +64,7 @@ jobs:
             subject-name: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
             subject-digest: ${{ steps.push.outputs.digest }}
             push-to-registry: true
-            
+
     deploy:
         runs-on: ubuntu-latest
         needs: build-and-push-backend-image
