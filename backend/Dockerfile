@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04 AS builder
 
 WORKDIR /usr/server/backend
 
@@ -18,5 +18,13 @@ RUN cargo build --release
 COPY ./ .
 RUN cargo build --release
 
+FROM ubuntu:22.04
+
+WORKDIR /usr/server/backend
+
+RUN apt update
+RUN apt-get install -y libpq-dev
+RUN apt install -y libasound2-dev
+COPY --from=builder /usr/server/backend/target/release/backend .
 EXPOSE 8080
-CMD ["./target/release/backend"]
+CMD ["./backend"]
