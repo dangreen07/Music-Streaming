@@ -1,12 +1,12 @@
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
-WORKDIR /usr/server/backend
+WORKDIR /app
 
 RUN apt update
-RUN apt-get install -y libpq-dev
 RUN apt install -y curl
 RUN apt install -y build-essential
 RUN apt install -y pkg-config
+RUN apt-get install -y libpq-dev
 RUN apt install -y libasound2-dev
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -15,16 +15,22 @@ RUN mkdir ./src
 RUN echo 'fn main() { panic!("Dummy Image Called!")}' > ./src/main.rs
 COPY Cargo.toml Cargo.lock ./
 RUN cargo build --release
+
 COPY ./ .
 RUN cargo build --release
 
-FROM ubuntu:22.04
+RUN strip target/release/backend
 
-WORKDIR /usr/server/backend
+FROM ubuntu:24.04 AS release
 
 RUN apt update
+RUN apt install -y curl
+RUN apt install -y pkg-config
 RUN apt-get install -y libpq-dev
 RUN apt install -y libasound2-dev
-COPY --from=builder /usr/server/backend/target/release/backend .
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/backend .
 EXPOSE 8080
 CMD ["./backend"]
