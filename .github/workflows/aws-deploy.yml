@@ -31,10 +31,15 @@ jobs:
           uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
           with:
             images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+        -
+                # Add support for more platforms with QEMU (optional)
+                # https://github.com/docker/setup-qemu-action
+          name: Set up QEMU
+          uses: docker/setup-qemu-action@v3
         - name: Set up Docker Buildx
           uses: docker/setup-buildx-action@v3
           with:
-            platforms: linux/arm64, linux/amd64
+            platforms: linux/amd64,linux/arm64/v8,linux/arm64
         - name: Build and push Docker image
           id: push
           uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
@@ -64,6 +69,9 @@ jobs:
             command_timeout: 45m
             script: 
                 |
+                sudo docker compose stop
                 cd /home/ubuntu/Music-Streaming
                 git pull
+                sudo docker compose rm -f
+                sudo docker compose pull
                 sudo docker compose up --build -d
