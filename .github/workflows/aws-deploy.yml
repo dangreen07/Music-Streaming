@@ -10,7 +10,7 @@ env:
   BACKEND_IMAGE_NAME: ${{ github.repository }}-backend
 
 jobs:
-    build-and-push-backend-image:
+    build-push-and-deploy-backend-image:
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -45,20 +45,17 @@ jobs:
             subject-name: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
             subject-digest: ${{ steps.push.outputs.digest }}
             push-to-registry: true
-    deploy:
-        runs-on: ubuntu-latest
-        steps:
-            -   name: executing remote ssh commands
-                uses: appleboy/ssh-action@v1.2.0
-                with:
-                    host: ${{ secrets.HOST }}
-                    username: ${{ secrets.USERNAME }}
-                    key: ${{ secrets.SSH_KEY }}
-                    port: ${{ secrets.PORT }}
-                    # This command may take a while to compile the rust code
-                    command_timeout: 45m
-                    script: 
-                        |
-                        cd /home/ubuntu/Music-Streaming
-                        git pull
-                        sudo docker compose up --build -d
+        - name: executing remote ssh commands
+          uses: appleboy/ssh-action@v1.2.0
+          with:
+            host: ${{ secrets.HOST }}
+            username: ${{ secrets.USERNAME }}
+            key: ${{ secrets.SSH_KEY }}
+            port: ${{ secrets.PORT }}
+            # This command may take a while to compile the rust code
+            command_timeout: 45m
+            script: 
+                |
+                cd /home/ubuntu/Music-Streaming
+                git pull
+                sudo docker compose up --build -d
