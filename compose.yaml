@@ -16,11 +16,11 @@ services:
     ports:
       - "3000:3000"
     links:
-      - "backend:localhost"
+      - "music-streaming-backend:localhost"
     environment:
       SERVER_URL: ${SERVER_URL}
       CLOUDFRONT_URL: ${CLOUDFRONT_URL}
-      SERVER_URL_FROM_SERVER: "http://backend:8080"
+      SERVER_URL_FROM_SERVER: "http://music-streaming-backend:8080"
 networks:
   default:
     driver: bridge
