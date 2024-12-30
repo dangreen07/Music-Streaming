@@ -1,5 +1,5 @@
 services:
-  backend:
+  music-streaming-backend:
     image: ghcr.io/dangreen07/music-streaming-backend:main
     # build : ./backend
     ports:
@@ -11,7 +11,7 @@ services:
       DO_REGION: ${DO_REGION}
       DO_ENDPOINT: ${DO_ENDPOINT}
       DO_BUCKET_NAME: ${DO_BUCKET_NAME}
-  frontend:
+  music-streaming-frontend:
     build : ./frontend
     ports:
       - "3000:3000"

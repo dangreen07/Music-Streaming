@@ -83,8 +83,8 @@ jobs:
             command_timeout: 45m
             script: 
                 |
-                sudo docker compose stop
                 cd /home/ubuntu/Music-Streaming
+                sudo docker compose stop
                 git pull
                 sudo docker compose rm -f
                 sudo docker compose pull
