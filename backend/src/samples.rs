@@ -9,52 +9,6 @@ use rodio::Source;
 
 use crate::{models::*, spaces::{delete_file_from_bucket, get_file_from_bucket}};
 
-pub fn get_sample(file: Vec<u8>, sample_number: u32) -> Result<Vec<u8>, &'static str> {
-    let reader = Cursor::new(file);
-    let mut reader = match WavReader::new(reader) {
-        Ok(r) => r,
-        Err(_) => return Err("Error opening audio file"),
-    };
-
-    let spec = reader.spec();
-    let sample_rate = spec.sample_rate;
-    let num_channels = spec.channels as usize;
-
-    // 10 seconds per sample
-    let samples_per_segment = sample_rate * 10 * num_channels as u32;
-
-    let mut samples = vec![];
-    let skip_num = usize::try_from(sample_number * samples_per_segment).unwrap();
-    for sample in reader.samples::<i16>().skip(skip_num) {
-        match sample {
-            Ok(s) => samples.push(s),
-            Err(_) => return Err("Error reading samples")
-        }
-
-        if samples.len() >= samples_per_segment as usize {
-            break;
-        }
-    }
-
-    if samples.is_empty() {
-        return Err("Audio file is empty or too short");
-    }
-
-    // Write the first segment to a new WAV file in memory
-    let mut buffer = Cursor::new(Vec::new());
-    {
-        let mut writer = WavWriter::new(&mut buffer, spec).unwrap();
-        for sample in &samples {
-            writer.write_sample(*sample).unwrap();
-        }
-        writer.finalize().unwrap();
-    }
-
-    let audio_bytes = buffer.into_inner();
-
-    Ok(audio_bytes)
-}
-
 pub async fn get_sample_from_bucket(song_id: &uuid::Uuid, sample_number: u32) -> Result<Vec<u8>, &'static str> {
     let file_name = format!("{}/{}.wav", song_id, sample_number);
     let resp = get_file_from_bucket(&file_name).await;

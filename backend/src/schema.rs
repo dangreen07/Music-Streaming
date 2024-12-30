@@ -25,10 +25,12 @@ diesel::table! {
         username -> Varchar,
         permissions -> Varchar,
         password_hash -> Varchar,
+        song_id -> Uuid
     }
 }
 
 diesel::joinable!(session -> users (user_id));
+diesel::joinable!(users -> songs (song_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     session,

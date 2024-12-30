@@ -4,5 +4,5 @@ export type Song = {
     artist: string,
     album: string,
     duration: number,
-    file_path: string
+    num_samples: number
 }

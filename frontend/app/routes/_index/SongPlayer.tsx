@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { FaBackwardStep, FaForwardStep, FaPause, FaPlay } from "react-icons/fa6";
+import { FaBackwardStep, FaForwardStep, FaPause, FaPlay, FaVolumeHigh } from "react-icons/fa6";
 import pako from 'pako';
+import { Song } from "~/types";
+import { HiOutlineQueueList } from "react-icons/hi2";
 
 function formatTime(seconds: number): string {
     const roundedSeconds = Math.round(seconds);
@@ -13,11 +15,13 @@ function formatTime(seconds: number): string {
 export default function SongPlayer({
   server_url,
   currentSong,
-  initial_song_duration: song_duration,
+  song_info,
+  cloudFrontUrl
 }: {
   server_url: string,
-  initial_song_duration: number,
-  currentSong: string
+  song_info: Song,
+  currentSong: string,
+  cloudFrontUrl: string
 }) {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
@@ -26,7 +30,8 @@ export default function SongPlayer({
     const [currentSample, setCurrentSample] = useState(-1);
     const [volumeNum, setVolumeNum] = useState(50);
     const [loadedSamples, setLoadedSamples] = useState(0); // 0 means no samples have been loaded
-    const [songDuration, setSongDuration] = useState(song_duration);
+    const [songInfo, setSongInfo] = useState(song_info);
+    const [songImage, setSongImage] = useState(`${cloudFrontUrl}/${currentSong}/${currentSong}.png`);
 
     async function GetAudio(sample_number: number = 0) {
       const response = await fetch(server_url + "/sample_compressed/" + encodeURI(currentSong) + "/" + sample_number);
@@ -47,8 +52,10 @@ export default function SongPlayer({
 
     async function GetSongInfo() {
       const response = await fetch(server_url + "/song_info/" + encodeURI(currentSong));
-      const songInfo = await response.json() as { song_duration: number };
-      setSongDuration(songInfo.song_duration);
+      const songInfo = await response.json() as Song;
+      // Update the song image once the song info is loaded
+      setSongImage(`${cloudFrontUrl}/${currentSong}/${currentSong}.png`);
+      setSongInfo(songInfo);
     }
 
     async function decodeAudioChunk(arrayBuffer: ArrayBuffer) {
@@ -144,7 +151,7 @@ export default function SongPlayer({
                 setCurrentSample(prev => prev + 1);
                 await nextSample(currentSample + 1);
             }
-            if (currentTime >= songDuration) {
+            if (currentTime >= songInfo.duration) {
                 stopAudio();
             } else {
                 setCurrentTime(currentTime);
@@ -156,8 +163,16 @@ export default function SongPlayer({
     }, [playing, audioContext, currentSample, loadedSamples]);
 
     return (
-        <div id="player-section" className="fixed bottom-0 flex items-center justify-between w-full bg-neutral-900 px-8 py-3 gap-2">
-        <div className="w-36"></div>
+        <div id="player-section" className="fixed bottom-0 flex items-center justify-between w-full bg-neutral-900 p-3 gap-2">
+        <div className="flex w-1/4 gap-3 justify-start items-center">
+          <div className="w-16 h-16">
+            <img src={songImage} alt="Current Song Cover" className="w-full h-full rounded-lg shadow-lg" />
+          </div>
+          <div className="flex flex-col justify-center">
+            <span className="text-white text-md font-semibold">{songInfo.title}</span>
+            <span className="text-gray-400 text-sm">{songInfo.artist}</span>
+          </div>
+        </div>
         <div className="flex flex-col items-center justify-center gap-2 w-1/2">
           <div className="flex gap-3 items-center">
             <button id="prev-btn" className="text-white p-2 rounded-full transition-transform active:scale-90 duration-200 ease-out">
@@ -179,12 +194,14 @@ export default function SongPlayer({
           </div>
           <div className="flex w-full items-center gap-2">
             <span id="current-song-time" className="text-white text-md w-12">{formatTime(currentTime)}</span>
-            <progress className="progress w-full" value={currentTime} max={songDuration}></progress>
-            <span id="song-duration" className="text-white text-md">{formatTime(songDuration)}</span>
+            <progress className="progress w-full" value={currentTime} max={songInfo.duration}></progress>
+            <span id="song-duration" className="text-white text-md">{formatTime(songInfo.duration)}</span>
           </div>
         </div>
-        <div id="right-section" className="flex w-36">
-          <input type="range" min={0} max="100" value={volumeNum} onChange={(current) => setVolumeNum(Number(current.target.value))} className="range" />
+        <div id="right-section" className="flex w-1/4 gap-4 items-center">
+          <button className="btn btn-sm btn-ghost btn-circle"><HiOutlineQueueList size={24} /></button>
+          <button className="btn btn-sm btn-ghost btn-circle"><FaVolumeHigh size={24} /></button>
+          <input type="range" min={0} max="100" value={volumeNum} onChange={(current) => setVolumeNum(Number(current.target.value))} className="range range-xs" />
         </div>
       </div>
     )

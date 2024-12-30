@@ -23,15 +23,6 @@ pub fn compress_data(data: Vec<u8>) -> Vec<u8> {
     return compressed_data;
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct SongInput {
-    pub title: String,
-    pub artist: String,
-    pub album: String,
-    pub duration: u32,
-    pub file: Vec<u8>
-}
-
 #[derive(Deserialize)]
 pub struct PostedUser {
     pub username: String,
@@ -47,18 +38,6 @@ pub struct SessionReturn {
 #[derive(Serialize, Deserialize)]
 pub struct SessionInput {
     pub session_id: uuid::Uuid
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SampleResponse {
-    pub sample_number: u32,
-    pub sample: Vec<u8>,
-    pub song_duration: u32
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SongInfo {
-    pub song_duration: u32
 }
 
 #[derive(Serialize)]

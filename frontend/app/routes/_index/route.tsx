@@ -9,6 +9,7 @@ import MainPageContent from "./MainPageContent";
 import MainPageContentSkeleton from "./MainPageContentSkeleton";
 import SongPlayerSkeleton from "./SongPlayerSkeleton";
 import NavigationBar from "~/components/NavigationBar";
+import { Song } from "~/types";
 
 export const meta: MetaFunction = () => {
   return [
@@ -19,7 +20,7 @@ export const meta: MetaFunction = () => {
 
 async function getSongInfo(server_url: string, song_id: string) {
   const response = await fetch(server_url + "/song_info/" + encodeURI(song_id));
-  const songInfo = await response.json() as { song_duration: number };
+  const songInfo = await response.json() as Song;
   return songInfo;
 }
 
@@ -66,7 +67,8 @@ export default function Index() {
           {songInfo => <SongPlayer 
             currentSong={currentSongID}
             server_url={server_url}
-            initial_song_duration={songInfo.song_duration}
+            song_info={songInfo}
+            cloudFrontUrl={cloudFrontUrl}
           />}
         </Await>
       </Suspense>

@@ -20,11 +20,10 @@ use backend::{
     samples::{
         delete_song_from_server, get_all_samples, get_sample_from_bucket, get_song, get_songs_list, insert_song, mp3_to_wav
     },
-    spaces::{get_file_from_bucket, upload_file_to_bucket},
+    spaces::upload_file_to_bucket,
     PostedUser,
     SessionInput,
     SessionReturn,
-    SongInfo,
     UserResponse
 };
 use actix_multipart::Multipart;
@@ -49,20 +48,6 @@ async fn songs_list() -> impl Responder {
         .json(songs_list)
 }
 
-#[get("/song_image/{song_id}")]
-async fn song_image(path: web::Path<uuid::Uuid>) -> impl Responder {
-    let song_id = path.into_inner();
-    let key = format!("{0}/{0}.png", song_id);
-    let file = get_file_from_bucket(&key).await;
-    let file = match file {
-        Ok(file) => file,
-        Err(_) => return HttpResponse::NotFound().body("Error loading song image")
-    };
-    HttpResponse::Ok()
-        .content_type("image/png")
-        .body(file)
-}
-
 #[get("/song_info/{song_id}")]
 async fn song_info(path: web::Path<uuid::Uuid>) -> impl Responder {
     let song_id = path.into_inner();
@@ -72,28 +57,9 @@ async fn song_info(path: web::Path<uuid::Uuid>) -> impl Responder {
         Ok(result) => result,
         Err(error) => return HttpResponse::InternalServerError().body(error)
     };
-
-    let output = SongInfo {
-        song_duration: u32::try_from(result.duration).unwrap()
-    };
     HttpResponse::Ok()
         .content_type("application/json")
-        .json(output)
-}
-
-/// Gets a 10 second sample from a song
-#[get("/sample/{song_id}/{sample_number}")]
-async fn samples_endpoint(path: web::Path<(uuid::Uuid, u32)>) -> impl Responder {
-    let (song_id, sample_number) = path.into_inner();
-
-    let resp = get_sample_from_bucket(&song_id, sample_number).await;
-    let resp = match resp {
-        Ok(resp) => resp,
-        Err(error) => return HttpResponse::InternalServerError().body(error)
-    };
-    HttpResponse::Ok()
-        .content_type("audio/wav")
-        .body(resp)
+        .json(result)
 }
 
 /// Get a 10 second sample from a song compressed with zlib
@@ -353,7 +319,6 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
-            .service(samples_endpoint)
             .service(signup)
             .service(login)
             .service(validate_session)
@@ -364,7 +329,6 @@ async fn main() -> std::io::Result<()> {
             .service(samples_compressed_endpoint)
             .service(add_song)
             .service(delete_song)
-            .service(song_image)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

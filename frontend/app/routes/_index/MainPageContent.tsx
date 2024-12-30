@@ -17,9 +17,9 @@ export default function MainPageContent({songsList, setCurrentSongID, cloudFront
                                 <FaMusic size={32} />
                             </div>
                         </object>
-                        <div className="flex flex-col justify-start items-start">
-                            <span className="text-lg font-semibold">{song.title}</span>
-                            <span className="text-sm">{song.artist}</span>
+                        <div className="flex flex-col h-16 justify-center items-start">
+                            <span className="text-md text-white font-semibold">{song.title}</span>
+                            <span className="text-gray-400 text-sm">{song.artist}</span>
                         </div>
                     </button>
                 )
