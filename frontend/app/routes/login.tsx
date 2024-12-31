@@ -49,7 +49,7 @@ export default function Login() {
                         if (data.error == "")
                         {
                             // Setting the session cookie
-                            Cookies.set("session_id", data.session_id);
+                            Cookies.set("session_id", data.session_id, { expires: 30});
                             // Redirecting to the home page
                             window.location.href = "/";
                         }
