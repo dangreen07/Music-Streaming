@@ -12,7 +12,8 @@ services:
       DO_ENDPOINT: ${DO_ENDPOINT}
       DO_BUCKET_NAME: ${DO_BUCKET_NAME}
   music-streaming-frontend:
-    build : ./frontend
+    image: ghcr.io/dangreen07/music-streaming-frontend:main
+    # build : ./frontend
     ports:
       - "3000:3000"
     links:
