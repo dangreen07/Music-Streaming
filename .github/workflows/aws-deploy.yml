@@ -127,5 +127,5 @@ jobs:
                 cd /home/ubuntu/Music-Streaming
                 sudo docker compose stop music-streaming-backend
                 sudo docker compose stop music-streaming-frontend
-                git pull
-                sudo docker compose up --build -d --pull always
+                sudo git pull
+                sudo docker compose up -d --pull always
