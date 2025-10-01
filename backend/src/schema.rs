@@ -15,7 +15,7 @@ diesel::table! {
         artist -> Varchar,
         album -> Varchar,
         duration -> Int4,
-        num_samples -> Int4
+        num_samples -> Int4,
     }
 }
 
@@ -25,7 +25,7 @@ diesel::table! {
         username -> Varchar,
         permissions -> Varchar,
         password_hash -> Varchar,
-        song_id -> Uuid
+        song_id -> Nullable<Uuid>,
     }
 }
 
